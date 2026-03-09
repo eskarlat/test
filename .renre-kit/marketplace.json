@@ -1,0 +1,7 @@
+{
+  "$schema": "https://renre-kit.dev/schemas/marketplace.json",
+  "name": "RenRe Kit Official Marketplace",
+  "url": "https://marketplace.renre-kit.dev",
+  "version": "1",
+  "extensions": []
+}

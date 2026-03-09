@@ -1,0 +1,218 @@
+// RenRe Kit Extension SDK
+// Types and utilities for building RenRe Kit extensions
+
+import type { Router } from "express";
+import type { ComponentType } from "react";
+
+export type HookEvent =
+  | "sessionStart"
+  | "sessionEnd"
+  | "userPromptSubmitted"
+  | "preToolUse"
+  | "postToolUse"
+  | "errorOccurred"
+  | "preCompact"
+  | "subagentStart"
+  | "subagentStop";
+
+export type SettingType = "string" | "vault" | "number" | "boolean" | "select";
+
+export type PermissionDecision = "allow" | "deny" | "ask";
+
+export interface ScopedStatement {
+  run(...params: unknown[]): { changes: number; lastInsertRowid: number | bigint };
+  get(...params: unknown[]): unknown;
+  all(...params: unknown[]): unknown[];
+}
+
+export interface ScopedDatabase {
+  readonly tablePrefix: string;
+  readonly projectId: string;
+  prepare(sql: string): ScopedStatement;
+  exec(sql: string): void;
+}
+
+export interface ExtensionLogger {
+  error(message: string, meta?: Record<string, unknown>): void;
+  warn(message: string, meta?: Record<string, unknown>): void;
+  info(message: string, meta?: Record<string, unknown>): void;
+  debug(message: string, meta?: Record<string, unknown>): void;
+}
+
+export interface MCPClient {
+  listTools(): Promise<MCPTool[]>;
+  callTool(name: string, args: Record<string, unknown>): Promise<unknown>;
+  listResources(): Promise<MCPResource[]>;
+  readResource(uri: string): Promise<unknown>;
+}
+
+export interface MCPTool {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
+
+export interface MCPResource {
+  uri: string;
+  name: string;
+  description?: string;
+  mimeType?: string;
+}
+
+export interface ExtensionContext {
+  projectId: string;
+  db: ScopedDatabase | null;
+  logger: ExtensionLogger;
+  config: Record<string, string>;
+  mcp: MCPClient | null;
+}
+
+export interface ExtensionPageProps {
+  projectId: string;
+  extensionName: string;
+  apiBaseUrl: string;
+}
+
+export interface ExtensionModule {
+  pages: Record<string, ComponentType<ExtensionPageProps>>;
+}
+
+export interface UIPage {
+  id: string;
+  label: string;
+  icon?: string;
+  path: string;
+}
+
+export interface ActionDefinition {
+  name: string;
+  description: string;
+  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+  path: string;
+}
+
+export interface SettingDefinition {
+  key: string;
+  type: SettingType;
+  label: string;
+  description?: string;
+  required?: boolean;
+  default?: string | number | boolean;
+  options?: { label: string; value: string }[];
+}
+
+export interface ExtensionPermissions {
+  database?: boolean;
+  network?: string[];
+  mcp?: boolean;
+  hooks?: HookEvent[];
+  vault?: string[];
+  filesystem?: string[];
+}
+
+export interface ExtensionHookConfig {
+  events: HookEvent[];
+  entrypoint: string;
+  timeout?: number;
+}
+
+export interface SkillDefinition {
+  name: string;
+  description: string;
+  file: string;
+}
+
+/** Extension backend entry point — the default export of `backend/index.ts` */
+export type ExtensionRouterFactory = (context: ExtensionContext) => Router;
+
+export interface ContextProviderManifest {
+  entrypoint: string;
+  maxTokens?: number;
+}
+
+// ---- Context Provider types (ADR-036) ----
+
+export interface ProviderSettingDefinition {
+  key: string;
+  label: string;
+  type: "string" | "number" | "boolean" | "select";
+  default: unknown;
+  description?: string;
+  options?: { label: string; value: string }[];
+}
+
+export interface FullContextProviderManifest {
+  name: string;
+  description: string;
+  icon?: string;
+  defaultEnabled: boolean;
+  configSchema?: ProviderSettingDefinition[];
+}
+
+export interface ContextRequest {
+  projectId: string;
+  config: Record<string, unknown>;
+  tokenBudget: number;
+  sessionInput: {
+    timestamp: number;
+    cwd: string;
+    source: string;
+    initialPrompt?: string;
+    sessionId?: string;
+  };
+}
+
+export interface ContextResponse {
+  content: string;
+  estimatedTokens: number;
+  itemCount: number;
+  truncated: boolean;
+  metadata?: {
+    lastUpdated?: string;
+    source?: string;
+  };
+}
+
+export interface MCPStdioConfig {
+  transport: "stdio";
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+}
+
+export interface MCPSSEConfig {
+  transport: "sse";
+  url: string;
+  headers?: Record<string, string>;
+  reconnect?: boolean;
+  reconnectIntervalMs?: number;
+}
+
+export interface ExtensionManifest {
+  name: string;
+  version: string;
+  displayName: string;
+  description: string;
+  author: string;
+  minSdkVersion?: string;
+  backend?: {
+    entrypoint: string;
+    actions?: ActionDefinition[];
+  };
+  ui?: {
+    pages: UIPage[];
+    bundle: string;
+    styles?: string;
+  };
+  mcp?: MCPStdioConfig | MCPSSEConfig;
+  migrations?: string;
+  settings?: {
+    schema: SettingDefinition[];
+  };
+  permissions?: ExtensionPermissions;
+  hooks?: ExtensionHookConfig;
+  skills?: SkillDefinition[];
+  contextProvider?: ContextProviderManifest;
+}
+
+export { SDK_VERSION } from "./version.js";

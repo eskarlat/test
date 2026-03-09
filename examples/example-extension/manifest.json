@@ -1,0 +1,48 @@
+{
+  "$schema": "../../schemas/manifest.json",
+  "name": "example-extension",
+  "version": "0.1.0",
+  "displayName": "Example Extension",
+  "description": "Demonstrates the RenRe Kit Extension SDK: backend routes, SQLite, migrations, settings, UI pages, and hooks.",
+  "author": "renre-kit",
+  "minSdkVersion": "0.1.0",
+  "backend": {
+    "entrypoint": "backend/index.js",
+    "actions": [
+      { "name": "list", "description": "List all items", "method": "GET", "path": "/items" },
+      { "name": "create", "description": "Create a new item", "method": "POST", "path": "/items" },
+      { "name": "delete", "description": "Delete an item by ID", "method": "DELETE", "path": "/items/:id" }
+    ]
+  },
+  "ui": {
+    "bundle": "ui/index.js",
+    "pages": [
+      { "id": "items", "label": "Items", "path": "items" },
+      { "id": "about", "label": "About", "path": "about" }
+    ]
+  },
+  "migrations": "migrations",
+  "settings": {
+    "schema": [
+      {
+        "key": "api_url",
+        "type": "string",
+        "label": "API URL",
+        "description": "Base URL for the external API",
+        "required": false,
+        "default": "https://api.example.com"
+      },
+      {
+        "key": "api_token",
+        "type": "vault",
+        "label": "API Token",
+        "description": "Secret API token stored in Vault",
+        "required": false
+      }
+    ]
+  },
+  "permissions": {
+    "database": true,
+    "network": ["api.example.com"]
+  }
+}

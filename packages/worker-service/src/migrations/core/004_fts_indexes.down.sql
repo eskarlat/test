@@ -1,0 +1,15 @@
+DROP TRIGGER IF EXISTS _sessions_fts_update;
+DROP TRIGGER IF EXISTS _sessions_fts_delete;
+DROP TRIGGER IF EXISTS _sessions_fts_insert;
+DROP TRIGGER IF EXISTS _errors_fts_delete;
+DROP TRIGGER IF EXISTS _errors_fts_insert;
+DROP TRIGGER IF EXISTS _obs_fts_update;
+DROP TRIGGER IF EXISTS _obs_fts_delete;
+DROP TRIGGER IF EXISTS _obs_fts_insert;
+DROP TRIGGER IF EXISTS _prompts_fts_update;
+DROP TRIGGER IF EXISTS _prompts_fts_delete;
+DROP TRIGGER IF EXISTS _prompts_fts_insert;
+DROP TABLE IF EXISTS _sessions_fts;
+DROP TABLE IF EXISTS _agent_errors_fts;
+DROP TABLE IF EXISTS _observations_fts;
+DROP TABLE IF EXISTS _prompts_fts;

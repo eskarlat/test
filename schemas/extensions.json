@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://renre-kit.dev/schemas/extensions.json",
+  "title": "RenRe Kit Extensions",
+  "type": "object",
+  "required": ["extensions"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "extensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "version", "enabled", "source"],
+        "properties": {
+          "name": { "type": "string" },
+          "version": { "type": "string" },
+          "enabled": { "type": "boolean" },
+          "source": { "type": "string" },
+          "marketplace": { "type": "string" },
+          "settings": { "type": "object" }
+        }
+      }
+    }
+  }
+}

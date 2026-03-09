@@ -1,0 +1,16 @@
+{
+  "threshold": 5,
+  "minLines": 5,
+  "minTokens": 50,
+  "reporters": ["console", "json"],
+  "output": ".jscpd-report",
+  "languages": ["typescript", "javascript"],
+  "path": ["packages"],
+  "ignore": [
+    "**/dist/**",
+    "**/node_modules/**",
+    "**/.turbo/**",
+    "**/vitest.config.ts",
+    "**/tsup.config.ts"
+  ]
+}

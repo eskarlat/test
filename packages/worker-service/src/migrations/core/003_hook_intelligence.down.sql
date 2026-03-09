@@ -1,0 +1,11 @@
+DROP TABLE IF EXISTS _context_recipes;
+DROP TABLE IF EXISTS _hook_activity;
+DROP TABLE IF EXISTS _subagent_events;
+DROP TABLE IF EXISTS _tool_usage;
+DROP TABLE IF EXISTS _error_patterns;
+DROP TABLE IF EXISTS _agent_errors;
+DROP TABLE IF EXISTS _prompts;
+DROP TABLE IF EXISTS _tool_audit;
+DROP TABLE IF EXISTS _tool_rules;
+DROP TABLE IF EXISTS _observations;
+DROP TABLE IF EXISTS _session_checkpoints;

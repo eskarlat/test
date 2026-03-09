@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+
+# Turbo cache
+.turbo/
+
+# Local env files
+*.local
+.env
+.env.*
+
+# RenRe Kit runtime state (not committed)
+.renre-kit/data.db
+.renre-kit/server.pid
+.renre-kit/server.json
+.renre-kit/extensions/
+.renre-kit/logs/
+.renre-kit/backups/
+
+# Editor
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Test coverage
+coverage/
+
+# jscpd duplication reports
+.jscpd-report/

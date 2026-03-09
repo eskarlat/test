@@ -1,0 +1,24 @@
+{
+  "name": "@renre-kit/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "renre-kit": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "commander": "^13.0.0",
+    "@clack/prompts": "^0.9.0",
+    "picocolors": "^1.1.1",
+    "cli-table3": "^0.6.5"
+  },
+  "devDependencies": {
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

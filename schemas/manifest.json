@@ -1,0 +1,413 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renre-kit.dev/schemas/manifest.json",
+  "title": "RenRe Kit Extension Manifest",
+  "description": "Schema for extension manifest.json — declares all metadata, capabilities, and requirements of a RenRe Kit extension.",
+  "type": "object",
+  "required": ["name", "version", "displayName", "description", "author"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference"
+    },
+    "name": {
+      "type": "string",
+      "description": "Unique extension identifier (kebab-case). Must not start with '__'.",
+      "pattern": "^(?!__)[a-z][a-z0-9-]*$",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "version": {
+      "type": "string",
+      "description": "Extension version (semver).",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$"
+    },
+    "displayName": {
+      "type": "string",
+      "description": "Human-readable extension name shown in Console UI.",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of what the extension does.",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "author": {
+      "type": "string",
+      "description": "Extension author name or organization.",
+      "minLength": 1
+    },
+    "minSdkVersion": {
+      "type": "string",
+      "description": "Minimum @renre-kit/extension-sdk version required (semver). Required for marketplace extensions.",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$"
+    },
+    "backend": {
+      "type": "object",
+      "description": "Backend Express router configuration.",
+      "required": ["entrypoint"],
+      "additionalProperties": false,
+      "properties": {
+        "entrypoint": {
+          "type": "string",
+          "description": "Relative path to the compiled backend entry point JS file (e.g. 'backend/index.js')."
+        },
+        "actions": {
+          "type": "array",
+          "description": "List of actions exposed by this extension's backend.",
+          "items": {
+            "$ref": "#/$defs/ActionDefinition"
+          }
+        }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "description": "Extension UI bundle configuration.",
+      "required": ["bundle", "pages"],
+      "additionalProperties": false,
+      "properties": {
+        "bundle": {
+          "type": "string",
+          "description": "Relative path to the compiled UI bundle (e.g. 'ui/index.js')."
+        },
+        "pages": {
+          "type": "array",
+          "description": "Pages provided by this extension UI.",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/UIPage"
+          }
+        },
+        "styles": {
+          "type": "string",
+          "description": "Optional relative path to a CSS file to inject alongside the UI bundle."
+        }
+      }
+    },
+    "mcp": {
+      "description": "MCP bridge configuration (stdio or SSE transport). One transport type per extension.",
+      "oneOf": [
+        { "$ref": "#/$defs/MCPStdioConfig" },
+        { "$ref": "#/$defs/MCPSSEConfig" }
+      ]
+    },
+    "migrations": {
+      "type": "string",
+      "description": "Relative path to the migrations directory containing NNN_name.up.sql / NNN_name.down.sql pairs."
+    },
+    "settings": {
+      "type": "object",
+      "description": "Extension settings schema — defines configurable values shown in Console UI.",
+      "required": ["schema"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SettingDefinition"
+          }
+        }
+      }
+    },
+    "permissions": {
+      "$ref": "#/$defs/ExtensionPermissions"
+    },
+    "hooks": {
+      "$ref": "#/$defs/ExtensionHookConfig"
+    },
+    "skills": {
+      "type": "array",
+      "description": "Skills provided by this extension (placed in .github/skills/{name}/SKILL.md).",
+      "items": {
+        "$ref": "#/$defs/SkillDefinition"
+      }
+    },
+    "contextProvider": {
+      "$ref": "#/$defs/ContextProviderManifest"
+    }
+  },
+  "$defs": {
+    "ActionDefinition": {
+      "type": "object",
+      "required": ["name", "description", "method", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Action identifier."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what the action does."
+        },
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"],
+          "description": "HTTP method."
+        },
+        "path": {
+          "type": "string",
+          "description": "Route path relative to the extension mount point (e.g. '/items' or '/items/:id')."
+        }
+      }
+    },
+    "UIPage": {
+      "type": "object",
+      "required": ["id", "label", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Page identifier — must match the key in the ExtensionModule.pages map."
+        },
+        "label": {
+          "type": "string",
+          "description": "Display label shown in the Console sidebar navigation."
+        },
+        "icon": {
+          "type": "string",
+          "description": "Optional icon name (from the Console icon set)."
+        },
+        "path": {
+          "type": "string",
+          "description": "URL path segment for this page within the extension routes."
+        }
+      }
+    },
+    "MCPStdioConfig": {
+      "type": "object",
+      "required": ["transport", "command", "args"],
+      "additionalProperties": false,
+      "properties": {
+        "transport": {
+          "type": "string",
+          "const": "stdio"
+        },
+        "command": {
+          "type": "string",
+          "description": "Command to spawn. Restricted to allowlist: node, npx, python, python3, deno, bun, uvx, docker.",
+          "enum": ["node", "npx", "python", "python3", "deno", "bun", "uvx", "docker"]
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Arguments passed to the command. Shell metacharacters are rejected."
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Additional environment variables for the spawned process."
+        }
+      }
+    },
+    "MCPSSEConfig": {
+      "type": "object",
+      "required": ["transport", "url"],
+      "additionalProperties": false,
+      "properties": {
+        "transport": {
+          "type": "string",
+          "const": "sse"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "SSE endpoint URL."
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "HTTP headers to include with the SSE connection request."
+        },
+        "reconnect": {
+          "type": "boolean",
+          "description": "Whether to automatically reconnect on disconnect.",
+          "default": true
+        },
+        "reconnectIntervalMs": {
+          "type": "integer",
+          "minimum": 100,
+          "description": "Milliseconds between reconnect attempts."
+        }
+      }
+    },
+    "SettingDefinition": {
+      "type": "object",
+      "required": ["key", "type", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Setting key used in config object passed to ExtensionContext.",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["string", "vault", "number", "boolean", "select"],
+          "description": "Setting type. 'vault' values are stored encrypted and never logged."
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label shown in the settings form."
+        },
+        "description": {
+          "type": "string",
+          "description": "Help text shown below the input in the settings form."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether this setting must be provided before the extension can be mounted.",
+          "default": false
+        },
+        "default": {
+          "description": "Default value used when the setting is not explicitly configured."
+        },
+        "options": {
+          "type": "array",
+          "description": "Allowed values for 'select' type settings.",
+          "items": {
+            "type": "object",
+            "required": ["label", "value"],
+            "properties": {
+              "label": {
+                "type": "string",
+                "description": "Display label shown to the user."
+              },
+              "value": {
+                "type": "string",
+                "description": "Actual value stored when this option is selected."
+              }
+            }
+          }
+        }
+      }
+    },
+    "ExtensionPermissions": {
+      "type": "object",
+      "description": "Permissions requested by the extension. Displayed to the user at install time.",
+      "additionalProperties": false,
+      "properties": {
+        "database": {
+          "type": "boolean",
+          "description": "Whether the extension requires SQLite database access via ScopedDatabase proxy."
+        },
+        "network": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Allowed network hostnames (e.g. ['api.example.com']). Requests to other hosts are blocked."
+        },
+        "mcp": {
+          "type": "boolean",
+          "description": "Whether the extension requires MCP bridge access."
+        },
+        "hooks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/HookEvent"
+          },
+          "description": "Hook events the extension subscribes to."
+        },
+        "vault": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Vault key names the extension is permitted to read."
+        },
+        "filesystem": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Filesystem paths the extension is permitted to access (glob patterns)."
+        }
+      }
+    },
+    "HookEvent": {
+      "type": "string",
+      "enum": [
+        "sessionStart",
+        "sessionEnd",
+        "userPromptSubmitted",
+        "preToolUse",
+        "postToolUse",
+        "errorOccurred",
+        "preCompact",
+        "subagentStart",
+        "subagentStop"
+      ]
+    },
+    "ExtensionHookConfig": {
+      "type": "object",
+      "required": ["events", "entrypoint"],
+      "additionalProperties": false,
+      "properties": {
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/HookEvent"
+          },
+          "description": "Hook events this extension handles."
+        },
+        "entrypoint": {
+          "type": "string",
+          "description": "Relative path to the hook handler entry point."
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 30000,
+          "description": "Maximum milliseconds for a hook handler to respond before being timed out."
+        }
+      }
+    },
+    "SkillDefinition": {
+      "type": "object",
+      "required": ["name", "description", "file"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Skill identifier (used as the directory name under .github/skills/)."
+        },
+        "description": {
+          "type": "string",
+          "description": "Short description of what the skill does."
+        },
+        "file": {
+          "type": "string",
+          "description": "Relative path to the SKILL.md file within the extension package."
+        }
+      }
+    },
+    "ContextProviderManifest": {
+      "type": "object",
+      "required": ["entrypoint"],
+      "additionalProperties": false,
+      "properties": {
+        "entrypoint": {
+          "type": "string",
+          "description": "Relative path to the context provider entry point."
+        },
+        "maxTokens": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum token budget this provider may consume."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://renre-kit.dev/schemas/project.json",
+  "title": "RenRe Kit Project",
+  "type": "object",
+  "required": ["id", "name"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "id": { "type": "string", "format": "uuid" },
+    "name": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

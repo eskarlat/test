@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RenRe Kit Marketplace Index",
+  "type": "object",
+  "required": ["name", "extensions"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "name": { "type": "string" },
+    "version": { "type": "string" },
+    "extensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "version", "description", "repository"],
+        "properties": {
+          "name": { "type": "string" },
+          "version": { "type": "string" },
+          "description": { "type": "string" },
+          "repository": { "type": "string", "format": "uri" },
+          "path": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}
