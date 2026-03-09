@@ -301,6 +301,79 @@ interface RunsPageContentProps {
   automationId: string;
 }
 
+// ---------------------------------------------------------------------------
+// RunsBodySection — the run list body (loading, empty, cards, load more)
+// ---------------------------------------------------------------------------
+
+interface RunsBodySectionProps {
+  runs: AutomationRun[];
+  runLoading: boolean;
+  statusFilter: string;
+  projectId: string;
+  automationId: string;
+  showLoadMore: boolean;
+  loadMoreLoading: boolean;
+  onLoadMore: () => void;
+}
+
+function RunsBodySection({
+  runs,
+  runLoading,
+  statusFilter,
+  projectId,
+  automationId,
+  showLoadMore,
+  loadMoreLoading,
+  onLoadMore,
+}: RunsBodySectionProps) {
+  const sortedRuns = sortRunsWithRunningFirst(runs);
+
+  return (
+    <>
+      {/* Loading */}
+      {runLoading && runs.length === 0 && <RunListSkeleton />}
+
+      {/* Empty state */}
+      {!runLoading && sortedRuns.length === 0 && (
+        <EmptyState hasFilter={statusFilter !== "all"} />
+      )}
+
+      {/* Run cards */}
+      {sortedRuns.length > 0 && (
+        <div className="space-y-3">
+          {sortedRuns.map((run, i) => (
+            <RunCard
+              key={run.id}
+              run={run}
+              index={sortedRuns.length - 1 - i}
+              projectId={projectId}
+              automationId={automationId}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Load more */}
+      {showLoadMore && (
+        <div className="flex justify-center">
+          <button
+            onClick={onLoadMore}
+            disabled={loadMoreLoading}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium",
+              "bg-accent text-accent-foreground hover:bg-accent/80 transition-colors",
+              loadMoreLoading && "opacity-50 cursor-not-allowed",
+            )}
+          >
+            {loadMoreLoading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+            Load More
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
 function RunsPageContent({ projectId, automationId }: RunsPageContentProps) {
   const navigate = useNavigate();
 
@@ -350,9 +423,8 @@ function RunsPageContent({ projectId, automationId }: RunsPageContentProps) {
     setLoadMoreLoading(false);
   }, [projectId, automationId, statusFilter, runs.length, fetchRuns]);
 
-  const sortedRuns = sortRunsWithRunningFirst(runs);
   const headerTitle = automationName ? `${automationName} \u2014 Run History` : "Run History";
-  const showLoadMore = hasMore && !runLoading && sortedRuns.length > 0;
+  const showLoadMore = hasMore && !runLoading && runs.length > 0;
 
   return (
     <div className="space-y-6">
@@ -390,46 +462,16 @@ function RunsPageContent({ projectId, automationId }: RunsPageContentProps) {
         </div>
       </div>
 
-      {/* Loading */}
-      {runLoading && runs.length === 0 && <RunListSkeleton />}
-
-      {/* Empty state */}
-      {!runLoading && sortedRuns.length === 0 && (
-        <EmptyState hasFilter={statusFilter !== "all"} />
-      )}
-
-      {/* Run cards */}
-      {sortedRuns.length > 0 && (
-        <div className="space-y-3">
-          {sortedRuns.map((run, i) => (
-            <RunCard
-              key={run.id}
-              run={run}
-              index={sortedRuns.length - 1 - i}
-              projectId={projectId}
-              automationId={automationId}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Load more */}
-      {showLoadMore && (
-        <div className="flex justify-center">
-          <button
-            onClick={handleLoadMore}
-            disabled={loadMoreLoading}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium",
-              "bg-accent text-accent-foreground hover:bg-accent/80 transition-colors",
-              loadMoreLoading && "opacity-50 cursor-not-allowed",
-            )}
-          >
-            {loadMoreLoading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-            Load More
-          </button>
-        </div>
-      )}
+      <RunsBodySection
+        runs={runs}
+        runLoading={runLoading}
+        statusFilter={statusFilter}
+        projectId={projectId}
+        automationId={automationId}
+        showLoadMore={showLoadMore}
+        loadMoreLoading={loadMoreLoading}
+        onLoadMore={handleLoadMore}
+      />
     </div>
   );
 }

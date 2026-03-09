@@ -200,16 +200,11 @@ interface RunDetailContentProps {
   onRunComplete: () => void;
 }
 
-function RunDetailContent({
-  projectId,
-  automationId,
-  runId,
-  automationName,
-  onBack,
-  onCancel,
-  onRunComplete,
-}: RunDetailContentProps) {
-  const activeRunData = useAutomationStore(selectActiveRun);
+// ---------------------------------------------------------------------------
+// CancelRunButton
+// ---------------------------------------------------------------------------
+
+function CancelRunButton({ onCancel }: { onCancel: () => Promise<void> }) {
   const [cancelling, setCancelling] = useState(false);
 
   const handleCancel = useCallback(async () => {
@@ -223,11 +218,104 @@ function RunDetailContent({
     }
   }, [onCancel]);
 
+  const CancelIcon = cancelling ? Loader2 : XCircle;
+
+  return (
+    <button
+      onClick={handleCancel}
+      disabled={cancelling}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
+        "bg-red-600 text-white hover:bg-red-700 transition-colors",
+        cancelling && "opacity-50 cursor-not-allowed",
+      )}
+    >
+      <CancelIcon className={cn("h-4 w-4", cancelling && "animate-spin")} aria-hidden="true" />
+      Cancel Run
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RunErrorSection
+// ---------------------------------------------------------------------------
+
+function RunErrorSection({ error }: { error: string }) {
+  return (
+    <div className="rounded-lg border border-red-500/30 bg-red-50 dark:bg-red-950/30 p-4 space-y-2">
+      <h3 className="text-sm font-semibold text-red-600 dark:text-red-400">Run Error</h3>
+      <pre className="text-xs font-mono text-red-600 dark:text-red-400 whitespace-pre-wrap break-all">
+        {error}
+      </pre>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RunDetailBody — the sections below the header (timeline, steps, output, error)
+// ---------------------------------------------------------------------------
+
+interface RunDetailBodyProps {
+  projectId: string;
+  automationId: string;
+  runId: string;
+  onRunComplete: () => void;
+}
+
+function RunDetailBody({ projectId, automationId, runId, onRunComplete }: RunDetailBodyProps) {
+  const activeRunData = useAutomationStore(selectActiveRun);
   if (!activeRunData) return null;
 
   const isRunning = activeRunData.status === "running";
+  const hasSteps = activeRunData.steps.length > 0;
+  const expandSteps = activeRunData.steps.length === 1;
   const lastStep = activeRunData.steps[activeRunData.steps.length - 1];
-  const finalOutput = lastStep?.response;
+  const showFinalOutput = !isRunning && lastStep?.response;
+
+  return (
+    <>
+      {isRunning && (
+        <LiveRunView runId={runId} projectId={projectId} automationId={automationId} onRunComplete={onRunComplete} />
+      )}
+      {hasSteps && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold">Chain Timeline</h2>
+          <ChainTimeline steps={activeRunData.steps} totalDurationMs={activeRunData.durationMs} />
+        </div>
+      )}
+      {activeRunData.worktree && <WorktreeInfoSection worktree={activeRunData.worktree} />}
+      {hasSteps && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold">Steps</h2>
+          {activeRunData.steps.map((step, i) => (
+            <StepDetail key={step.stepId} step={step} index={i} defaultExpanded={expandSteps} />
+          ))}
+        </div>
+      )}
+      {showFinalOutput && <FinalOutputSection response={lastStep.response} />}
+      {activeRunData.error && <RunErrorSection error={activeRunData.error} />}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RunDetailContent
+// ---------------------------------------------------------------------------
+
+function RunDetailContent({
+  projectId,
+  automationId,
+  runId,
+  automationName,
+  onBack,
+  onCancel,
+  onRunComplete,
+}: RunDetailContentProps) {
+  const activeRunData = useAutomationStore(selectActiveRun);
+
+  if (!activeRunData) return null;
+
+  const isRunning = activeRunData.status === "running";
 
   return (
     <div className="space-y-6">
@@ -249,79 +337,15 @@ function RunDetailContent({
             durationMs={activeRunData.durationMs}
           />
         </div>
-
-        {isRunning && (
-          <button
-            onClick={handleCancel}
-            disabled={cancelling}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
-              "bg-red-600 text-white hover:bg-red-700 transition-colors",
-              cancelling && "opacity-50 cursor-not-allowed",
-            )}
-          >
-            {cancelling ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <XCircle className="h-4 w-4" aria-hidden="true" />
-            )}
-            Cancel Run
-          </button>
-        )}
+        {isRunning && <CancelRunButton onCancel={onCancel} />}
       </div>
 
-      {/* Live view for running automations */}
-      {isRunning && (
-        <LiveRunView
-          runId={runId}
-          projectId={projectId}
-          automationId={automationId}
-          onRunComplete={onRunComplete}
-        />
-      )}
-
-      {/* Chain Timeline */}
-      {activeRunData.steps.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold">Chain Timeline</h2>
-          <ChainTimeline steps={activeRunData.steps} totalDurationMs={activeRunData.durationMs} />
-        </div>
-      )}
-
-      {/* Worktree Info */}
-      {activeRunData.worktree && (
-        <WorktreeInfoSection worktree={activeRunData.worktree} />
-      )}
-
-      {/* Step Details */}
-      {activeRunData.steps.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold">Steps</h2>
-          {activeRunData.steps.map((step, i) => (
-            <StepDetail
-              key={step.stepId}
-              step={step}
-              index={i}
-              defaultExpanded={activeRunData.steps.length === 1}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Final Output */}
-      {!isRunning && finalOutput && (
-        <FinalOutputSection response={finalOutput} />
-      )}
-
-      {/* Error section for failed runs */}
-      {activeRunData.error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-50 dark:bg-red-950/30 p-4 space-y-2">
-          <h3 className="text-sm font-semibold text-red-600 dark:text-red-400">Run Error</h3>
-          <pre className="text-xs font-mono text-red-600 dark:text-red-400 whitespace-pre-wrap break-all">
-            {activeRunData.error}
-          </pre>
-        </div>
-      )}
+      <RunDetailBody
+        projectId={projectId}
+        automationId={automationId}
+        runId={runId}
+        onRunComplete={onRunComplete}
+      />
     </div>
   );
 }

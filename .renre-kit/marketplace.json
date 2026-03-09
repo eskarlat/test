@@ -3,5 +3,38 @@
   "name": "RenRe Kit Official Marketplace",
   "url": "https://marketplace.renre-kit.dev",
   "version": "1",
-  "extensions": []
+  "extensions": [
+    {
+      "name": "figma-mcp",
+      "version": "1.0.0",
+      "description": "Bridge to Figma Desktop's local MCP server over SSE — exposes Figma design file tools and resources via renre-kit query.",
+      "repository": "https://github.com/renre-kit/ext-figma-mcp",
+      "path": "extensions/figma-mcp",
+      "tags": ["mcp", "figma", "design", "sse"]
+    },
+    {
+      "name": "context7-mcp",
+      "version": "1.0.0",
+      "description": "Bridge to Context7 — fetch up-to-date, version-specific documentation for any library directly into your prompt context.",
+      "repository": "https://github.com/renre-kit/ext-context7-mcp",
+      "path": "extensions/context7-mcp",
+      "tags": ["mcp", "documentation", "context", "libraries"]
+    },
+    {
+      "name": "atlassian-mcp",
+      "version": "1.0.0",
+      "description": "Bridge to Atlassian Jira and Confluence via the mcp-atlassian MCP server — search issues, read pages, manage tickets and wiki content.",
+      "repository": "https://github.com/renre-kit/ext-atlassian-mcp",
+      "path": "extensions/atlassian-mcp",
+      "tags": ["mcp", "atlassian", "jira", "confluence", "project-management"]
+    },
+    {
+      "name": "sdd-workflow",
+      "version": "1.0.0",
+      "description": "Structured Design-Driven workflow for AI agents — plan tasks with ADRs and diagrams, implement phase-by-phase using Ralph loop, and verify plan-vs-implementation parity.",
+      "repository": "https://github.com/renre-kit/ext-sdd-workflow",
+      "path": "extensions/sdd-workflow",
+      "tags": ["workflow", "planning", "implementation", "verification", "sdd"]
+    }
+  ]
 }
