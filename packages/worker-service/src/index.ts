@@ -1,12 +1,17 @@
-import { createServer } from "node:net";
+import { createServer as createNetServer } from "node:net";
+import { createServer as createHttpServer } from "node:http";
+import { networkInterfaces } from "node:os";
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync } from "node:fs";
 import { copyFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Server } from "node:http";
+import type { Server as HttpServer } from "node:http";
+import { Server as SocketIOServer } from "socket.io";
 import { createApp } from "./app.js";
+import { attachSocketBridge } from "./core/socket-bridge.js";
+import { copilotBridge } from "./core/copilot-bridge.js";
 import { dbManager } from "./core/db-manager.js";
-import { startMemoryMonitor } from "./core/extension-registry.js";
+import { startMemoryMonitor, getRegistry as getExtensionRegistry } from "./core/extension-registry.js";
 import { logger, setLogLevel, type LogLevel } from "./core/logger.js";
 import { globalPaths } from "./core/paths.js";
 import {
@@ -20,6 +25,16 @@ import { setServerPort } from "./core/server-port.js";
 import { checkAndEmitUpdates } from "./core/update-checker.js";
 import { getRegistry as getProjectRegistry } from "./routes/projects.js";
 import { runAutoPurge } from "./core/auto-purge-scheduler.js";
+import { WorktreeManager } from "./core/worktree-manager.js";
+import { setWorktreeManager } from "./routes/worktrees.js";
+import { AutomationEngine } from "./core/automation-engine.js";
+import {
+  setAutomationEngine,
+  setCopilotBridge as setAutomationCopilotBridge,
+  setDb as setAutomationDb,
+} from "./routes/automations.js";
+import { setExtensionLoaderIO } from "./core/extension-loader.js";
+import { setExtCronDb } from "./routes/ext-cron.js";
 
 interface BackupConfig {
   intervalHours?: number;
@@ -30,6 +45,23 @@ interface BackupConfig {
 interface ServerConfig {
   logLevel?: LogLevel;
   backup?: BackupConfig;
+}
+
+// Module-level Socket.IO instance for use by chat routes (Phase 4)
+let ioInstance: SocketIOServer | null = null;
+
+// Module-level WorktreeManager instance for shutdown access
+let worktreeManagerInstance: WorktreeManager | null = null;
+
+// Module-level AutomationEngine instance for shutdown access
+let automationEngineInstance: AutomationEngine | null = null;
+
+export function getSocketIO(): SocketIOServer | null {
+  return ioInstance;
+}
+
+export function getWorktreeManager(): WorktreeManager | null {
+  return worktreeManagerInstance;
 }
 
 async function findAvailablePort(preferred: number): Promise<number> {
@@ -59,10 +91,10 @@ async function isExistingRenreKitInstance(port: number): Promise<boolean> {
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const server = createServer();
+    const server = createNetServer();
     server.once("error", () => resolve(false));
     server.once("listening", () => { server.close(); resolve(true); });
-    server.listen(port, "127.0.0.1");
+    server.listen(port, "0.0.0.0");
   });
 }
 
@@ -141,7 +173,18 @@ function applyBackupSchedule(intervalHours: number, retention: BackupRetentionCo
   pruneBackups(retention);
 }
 
-function registerShutdownHandlers(server: Server): void {
+function stopAllExtensionSchedulers(): void {
+  const registry = getExtensionRegistry();
+  for (const extensions of registry.values()) {
+    for (const entry of extensions.values()) {
+      if (entry.loaded?.scheduler) {
+        entry.loaded.scheduler.stopAll();
+      }
+    }
+  }
+}
+
+function registerShutdownHandlers(httpServer: HttpServer, io: SocketIOServer): void {
   function shutdown(signal: string): void {
     logger.info("worker", `Received ${signal}, shutting down...`);
 
@@ -151,11 +194,26 @@ function registerShutdownHandlers(server: Server): void {
     }, 5000);
     forceExit.unref();
 
-    server.close(() => {
-      dbManager.close();
-      cleanupPidFiles();
-      logger.info("worker", "Worker service stopped");
-      process.exit(0);
+    // Stop AutomationEngine before WorktreeManager (cleanup timers, cancel runs)
+    automationEngineInstance?.stop();
+
+    // Stop all extension schedulers
+    stopAllExtensionSchedulers();
+
+    // Stop WorktreeManager (cleanup timers)
+    worktreeManagerInstance?.stop();
+
+    // Shutdown CopilotBridge before Socket.IO
+    copilotBridge.shutdown().catch(() => {});
+
+    // Close Socket.IO before HTTP server (ADR-048)
+    io.close(() => {
+      httpServer.close(() => {
+        dbManager.close();
+        cleanupPidFiles();
+        logger.info("worker", "Worker service stopped");
+        process.exit(0);
+      });
     });
   }
 
@@ -165,6 +223,17 @@ function registerShutdownHandlers(server: Server): void {
   if (process.platform === "win32") {
     process.on("SIGBREAK" as NodeJS.Signals, () => shutdown("SIGBREAK"));
   }
+}
+
+function getNetworkAddress(): string | null {
+  const interfaces = networkInterfaces();
+  for (const infos of Object.values(interfaces)) {
+    if (!infos) continue;
+    for (const info of infos) {
+      if (info.family === "IPv4" && !info.internal) return info.address;
+    }
+  }
+  return null;
 }
 
 async function main(): Promise<void> {
@@ -198,18 +267,55 @@ async function main(): Promise<void> {
     },
   );
 
-  // Start server
+  // Start server with Socket.IO (ADR-048)
   const port = await findAvailablePort(preferredPort);
   const app = createApp();
+  const httpServer = createHttpServer(app);
 
-  const server = app.listen(port, "127.0.0.1", () => {
-    writePidFile(process.pid, port);
-    setServerPort(port);
-    logger.info("worker", `Worker service started on port ${port}`);
-    console.log(`Worker service started on port ${port}`);
+  const io = new SocketIOServer(httpServer, {
+    cors: { origin: "*" },
+    pingInterval: 25000,
+    pingTimeout: 20000,
+    connectionStateRecovery: {
+      maxDisconnectionDuration: 120000, // 2 min buffer
+    },
   });
 
-  registerShutdownHandlers(server);
+  ioInstance = io;
+  copilotBridge.setIO(io);
+  attachSocketBridge(io);
+  setExtensionLoaderIO(io);
+  setExtCronDb(dbManager.getConnection());
+
+  // Initialize WorktreeManager and wire into routes (ADR-051, Phase 2)
+  const worktreeManager = new WorktreeManager(dbManager.getConnection(), io);
+  worktreeManagerInstance = worktreeManager;
+  setWorktreeManager(worktreeManager);
+  await worktreeManager.start();
+
+  // Initialize AutomationEngine and wire into routes (ADR-050, Phase 5)
+  const automationEngine = new AutomationEngine(dbManager.getConnection(), io);
+  automationEngine.setCopilotBridge(copilotBridge);
+  automationEngine.setWorktreeManager(worktreeManager);
+  automationEngineInstance = automationEngine;
+  setAutomationEngine(automationEngine);
+  setAutomationCopilotBridge(copilotBridge);
+  setAutomationDb(dbManager.getConnection());
+  automationEngine.start();
+
+  httpServer.listen(port, "0.0.0.0", () => {
+    writePidFile(process.pid, port);
+    setServerPort(port);
+    logger.info("worker", `Worker service started on port ${port} (Socket.IO enabled)`);
+    console.log(`Worker service started on port ${port}`);
+    console.log(`  Local:   http://localhost:${port}`);
+    const networkAddress = getNetworkAddress();
+    if (networkAddress) {
+      console.log(`  Network: http://${networkAddress}:${port}`);
+    }
+  });
+
+  registerShutdownHandlers(httpServer, io);
   startMemoryMonitor();
   runAutoPurge();
 

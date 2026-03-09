@@ -1,8 +1,9 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { homedir } from "node:os";
 import { globalPaths } from "../utils/paths.js";
 import type { MarketplaceConfig } from "../utils/config.js";
-import { buildMarketplaceFetchUrl } from "../shared/urls.js";
+import { buildMarketplaceFetchUrl, isLocalPath } from "../shared/urls.js";
 
 export interface MarketplaceExtension {
   name: string;
@@ -29,7 +30,47 @@ function cacheFilePath(): string {
   return join(globalPaths().globalDir, "marketplace-cache.json");
 }
 
+/**
+ * Resolve a marketplace source to a local filesystem path.
+ * Handles `~/...`, `file://...`, and absolute paths.
+ */
+function resolveLocalMarketplacePath(source: string): string {
+  if (source.startsWith("file://")) {
+    return source.slice(7); // strip file:// prefix
+  }
+  if (source.startsWith("~")) {
+    return join(homedir(), source.slice(1));
+  }
+  return resolve(source);
+}
+
+/**
+ * Read a marketplace index from a local filesystem path.
+ * Looks for `marketplace.json` in the given directory, or reads
+ * the path directly if it points to a `.json` file.
+ */
+export function fetchLocalMarketplace(localPath: string): MarketplaceExtension[] {
+  const resolved = resolveLocalMarketplacePath(localPath);
+  const filePath = resolved.endsWith(".json")
+    ? resolved
+    : join(resolved, "marketplace.json");
+
+  if (!existsSync(filePath)) {
+    throw new Error(`Local marketplace file not found: ${filePath}`);
+  }
+  const data = JSON.parse(readFileSync(filePath, "utf8")) as { extensions?: MarketplaceExtension[] };
+  if (!Array.isArray(data.extensions)) {
+    throw new Error(`Invalid local marketplace at ${filePath}: missing extensions array`);
+  }
+  return data.extensions;
+}
+
 export async function fetchMarketplace(url: string): Promise<MarketplaceExtension[]> {
+  // Handle local filesystem marketplaces
+  if (isLocalPath(url)) {
+    return fetchLocalMarketplace(url);
+  }
+
   const fetchUrl = buildMarketplaceFetchUrl(url);
   const res = await fetch(fetchUrl, { signal: AbortSignal.timeout(10000) });
   if (!res.ok) {

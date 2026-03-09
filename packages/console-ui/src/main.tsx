@@ -1,4 +1,4 @@
-import { StrictMode, lazy, Suspense } from "react";
+import { StrictMode, lazy, Suspense, useEffect, useState, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider, Outlet } from "react-router";
 import "./globals.css";
@@ -8,8 +8,10 @@ import { GlobalErrorBoundary } from "./components/layout/ContentArea";
 import { ReconnectionBanner } from "./components/layout/ReconnectionBanner";
 import { ToastContainer } from "./components/ui/ToastContainer";
 import { Skeleton } from "./components/ui/Skeleton";
-import { useWorkerEvents } from "./api/events";
+import { useSystemEvents, useProjectEvents } from "./api/events";
+import { useSocketStore } from "./api/socket";
 import { BASE_URL } from "./api/client";
+import { useProjectStore } from "./stores/project-store";
 import SystemHome from "./routes/home";
 
 const VaultPage = lazy(() => import("./routes/vault"));
@@ -27,6 +29,12 @@ const ErrorsPage = lazy(() => import("./routes/errors"));
 const ToolAnalyticsPage = lazy(() => import("./routes/tools"));
 const ContextRecipesPage = lazy(() => import("./routes/context-recipes"));
 const SearchPage = lazy(() => import("./routes/search"));
+const ChatPage = lazy(() => import("./routes/chat"));
+const WorktreesPage = lazy(() => import("./routes/worktrees"));
+const AutomationsPage = lazy(() => import("./routes/automations"));
+const AutomationEditorPage = lazy(() => import("./routes/automation-editor"));
+const AutomationRunsPage = lazy(() => import("./routes/automation-runs"));
+const AutomationRunDetailPage = lazy(() => import("./routes/automation-run-detail"));
 
 function PageSkeleton() {
   return (
@@ -40,15 +48,53 @@ function PageSkeleton() {
 }
 
 function RootLayout() {
-  useWorkerEvents(BASE_URL);
+  const connect = useSocketStore((s) => s.connect);
+  const disconnect = useSocketStore((s) => s.disconnect);
+  const activeProjectId = useProjectStore((s) => s.activeProjectId);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), []);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+
+  // Sync dark/light class with system preference
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    function apply(e: MediaQueryList | MediaQueryListEvent) {
+      document.documentElement.classList.toggle("dark", e.matches);
+    }
+    apply(mq);
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  // Initialize Socket.IO connection
+  useEffect(() => {
+    connect(BASE_URL);
+    return () => disconnect();
+  }, [connect, disconnect]);
+
+  // Subscribe to system and project events
+  useSystemEvents();
+  useProjectEvents(activeProjectId);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      <Sidebar />
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={closeSidebar}
+          aria-hidden="true"
+        />
+      )}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 md:relative md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+      >
+        <Sidebar onNavigate={closeSidebar} />
+      </div>
       <div className="flex flex-col flex-1 min-w-0">
-        <Toolbar />
+        <Toolbar onMenuToggle={toggleSidebar} />
         <ReconnectionBanner />
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <GlobalErrorBoundary>
             <Suspense fallback={<PageSkeleton />}>
               <Outlet />
@@ -82,6 +128,14 @@ const router = createBrowserRouter([
       { path: ":projectId/tools", element: <ToolAnalyticsPage /> },
       { path: ":projectId/context-recipes", element: <ContextRecipesPage /> },
       { path: ":projectId/search", element: <SearchPage /> },
+      { path: ":projectId/chat", element: <ChatPage /> },
+      { path: ":projectId/chat/:sessionId", element: <ChatPage /> },
+      { path: ":projectId/worktrees", element: <WorktreesPage /> },
+      { path: ":projectId/automations", element: <AutomationsPage /> },
+      { path: ":projectId/automations/new", element: <AutomationEditorPage /> },
+      { path: ":projectId/automations/:id/edit", element: <AutomationEditorPage /> },
+      { path: ":projectId/automations/:id/runs", element: <AutomationRunsPage /> },
+      { path: ":projectId/automations/:id/runs/:runId", element: <AutomationRunDetailPage /> },
       { path: ":projectId/:extensionName/:pageId", element: <ExtensionPageRoute /> },
     ],
   },

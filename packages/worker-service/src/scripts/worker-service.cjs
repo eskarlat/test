@@ -146,14 +146,16 @@ function postEnqueue(port, body) {
 
 async function main() {
   const args = process.argv.slice(2);
-  // args: hook <agent> <event> <feature>
-  if (args[0] !== "hook" || args.length < 4) {
+  // New format (ADR-046): hook <agent> <event> <feature>
+  // Old format (pre-046): hook <agent> <feature>
+  if (args[0] !== "hook" || args.length < 3) {
     process.exit(0);
   }
 
   const agent = args[1];
-  const eventArg = args[2];
-  const feature = args[3];
+  const is4ArgFormat = args.length >= 4;
+  const eventArg = is4ArgFormat ? args[2] : null;
+  const feature = is4ArgFormat ? args[3] : args[2];
 
   // Read stdin (event context from AI agent)
   let input = {};
@@ -188,6 +190,22 @@ async function main() {
   // 3. Fallback: feature name itself (legacy/manual usage)
   const rawEvent = eventArg || input.event || feature;
   const event = EVENT_MAP[rawEvent] || rawEvent;
+
+  // Log event resolution source to stderr (stdout is reserved for hook response JSON)
+  let eventSource = "fallback";
+  if (eventArg) {
+    eventSource = "cli-arg";
+  } else if (input.event) {
+    eventSource = "stdin";
+  }
+  process.stderr.write(`[renre-kit] Event resolved from: ${eventSource} (${event})\n`);
+
+  // Stale hook file detection: warn when old 3-arg format is used
+  if (!is4ArgFormat) {
+    process.stderr.write(
+      "[renre-kit] Hook file uses old format (missing event arg). Run 'renre-kit init' to regenerate.\n"
+    );
+  }
 
   // Compute batch ID: SHA-256(event + timestamp + cwd) truncated to 16 chars
   const ts = String(input.timestamp || Date.now());

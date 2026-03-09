@@ -62,3 +62,16 @@ export function buildMarketplaceFetchUrl(repoUrl: string): string {
   }
   return `${base}/marketplace.json`;
 }
+
+/**
+ * Returns true if the value looks like a local filesystem path
+ * rather than a URL. Matches absolute paths (/, ~/, C:\) and
+ * explicit file:// URIs.
+ */
+export function isLocalPath(value: string): boolean {
+  if (value.startsWith("file://")) return true;
+  if (value.startsWith("/") || value.startsWith("~")) return true;
+  // Windows absolute path: C:\ or D:/
+  if (/^[A-Za-z]:[/\\]/.test(value)) return true;
+  return false;
+}

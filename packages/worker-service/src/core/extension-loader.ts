@@ -10,6 +10,18 @@ import { circuitBreaker } from "./extension-circuit-breaker.js";
 import type { ExtensionManifest, ExtensionContext, MCPClient } from "@renre-kit/extension-sdk";
 import { resolveSettings } from "./settings-resolver.js";
 import * as mcpManager from "./mcp-manager.js";
+import { getRegistry as getProjectRegistry } from "../routes/projects.js";
+import { copilotBridge } from "./copilot-bridge.js";
+import { createScopedLLM } from "./scoped-llm.js";
+import { ScopedScheduler } from "./scoped-scheduler.js";
+import type { Server } from "socket.io";
+
+// Module-level Socket.IO instance for scheduler wiring
+let ioInstance: Server | null = null;
+
+export function setExtensionLoaderIO(io: Server): void {
+  ioInstance = io;
+}
 
 export interface LoadedExtension {
   readonly name: string;
@@ -18,6 +30,7 @@ export interface LoadedExtension {
   readonly manifest: ExtensionManifest;
   readonly routeCount: number;
   readonly mcpTransport?: string;
+  readonly scheduler?: ScopedScheduler;
 }
 
 export interface ExtensionLoadError {
@@ -108,12 +121,38 @@ function buildContext(
     }
   }
 
+  // Wire ScopedLLM if extension declares llm permission.
+  // Bridge is lazy-initialized (ADR-047 §2.1) — ensureStarted() is called
+  // transparently on first ScopedLLM operation, so no readiness check here.
+  const llm =
+    manifest.permissions?.llm === true
+      ? createScopedLLM(extensionName, projectId, copilotBridge)
+      : null;
+
+  // Wire ScopedScheduler only if extension declares scheduler permission
+  let scheduler: ScopedScheduler | null = null;
+  if (manifest.permissions?.scheduler === true && ioInstance) {
+    scheduler = new ScopedScheduler(
+      dbManager.getConnection(),
+      ioInstance,
+      extensionName,
+      projectId,
+      { db, logger: extLogger, config: resolvedConfig, mcp },
+    );
+  }
+
+  const projectEntry = getProjectRegistry().get(projectId);
+  const projectDir = projectEntry?.path ?? process.cwd();
+
   return {
     projectId,
+    projectDir,
     db,
     logger: extLogger,
     config: resolvedConfig,
     mcp,
+    llm,
+    scheduler,
   };
 }
 
@@ -171,15 +210,29 @@ export async function loadExtension(
   const router = loadRouter(extDir, extensionName, manifest, context);
   const routeCount = countRoutes(router);
 
+  // Start cron scheduler if the extension has one
+  const scheduler = context.scheduler as ScopedScheduler | null;
+  if (scheduler) {
+    scheduler.loadAndSchedule();
+  }
+
   // Record successful load (reset any prior error state)
   circuitBreaker.recordSuccess(projectId, extensionName);
 
-  return {
+  const result: LoadedExtension = {
     name: extensionName,
     version,
     router,
     manifest,
     routeCount,
-    mcpTransport: manifest.mcp?.transport,
   };
+
+  if (manifest.mcp?.transport) {
+    (result as { mcpTransport: string }).mcpTransport = manifest.mcp.transport;
+  }
+  if (scheduler) {
+    (result as { scheduler: ScopedScheduler }).scheduler = scheduler;
+  }
+
+  return result;
 }

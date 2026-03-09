@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
 import { Search, X } from "lucide-react";
 import { apiGet } from "../../api/client";
@@ -155,8 +156,8 @@ export function SearchPalette({ projectId }: SearchPaletteProps) {
         <Search className="h-4 w-4" aria-hidden="true" />
       </button>
 
-      {/* Palette overlay */}
-      {open && (
+      {/* Palette overlay — portaled to body to escape Toolbar's backdrop-blur containing block */}
+      {open && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 bg-black/50 backdrop-blur-sm"
           role="dialog"
@@ -253,7 +254,8 @@ export function SearchPalette({ projectId }: SearchPaletteProps) {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

@@ -1,0 +1,103 @@
+{
+  "$schema": "https://renre-kit.dev/schemas/manifest.json",
+  "name": "sdd-workflow",
+  "version": "1.0.0",
+  "displayName": "SDD Workflow",
+  "description": "Structured Design-Driven workflow for AI agents — plan tasks with ADRs and diagrams, implement phase-by-phase using Ralph loop, and verify plan-vs-implementation parity. Works with Copilot, Claude Code, or any agent CLI.",
+  "author": "renre-kit",
+  "minSdkVersion": "0.1.0",
+  "backend": {
+    "entrypoint": "backend/index.js",
+    "actions": [
+      {
+        "name": "list-tasks",
+        "description": "List all SDD tasks with phases, grouped by recency",
+        "method": "GET",
+        "path": "/tasks"
+      },
+      {
+        "name": "get-task",
+        "description": "Get a single task with file tree",
+        "method": "GET",
+        "path": "/tasks/:name"
+      },
+      {
+        "name": "read-file",
+        "description": "Read a markdown file from a task directory",
+        "method": "GET",
+        "path": "/tasks/:name/file"
+      },
+      {
+        "name": "review",
+        "description": "Submit a file for LLM review with inline comments",
+        "method": "POST",
+        "path": "/tasks/:name/review"
+      },
+      {
+        "name": "check-mtime",
+        "description": "Check file modification time for change detection",
+        "method": "GET",
+        "path": "/tasks/:name/mtime"
+      }
+    ]
+  },
+  "ui": {
+    "bundle": "ui/index.js",
+    "pages": [
+      {
+        "id": "tasks",
+        "label": "Tasks",
+        "icon": "list-checks",
+        "path": "/tasks"
+      },
+      {
+        "id": "task-detail",
+        "label": "Task Detail",
+        "path": "/task-detail"
+      }
+    ]
+  },
+  "permissions": {
+    "filesystem": true,
+    "llm": true
+  },
+  "skills": [
+    {
+      "name": "plan",
+      "description": "Structured planning: analyze context, create ADRs/diagrams, build phased plan with validation gates. Use when the user needs to plan a feature, task, or project.",
+      "file": "skills/plan.md"
+    },
+    {
+      "name": "implement",
+      "description": "Ralph loop implementation: runs AI agent in a self-correcting while loop per phase until all gates (lint, duplication, tests, plan-vs-implementation) pass. Default agent: copilot --yolo.",
+      "file": "skills/implement.md"
+    },
+    {
+      "name": "check",
+      "description": "Verify plan-vs-implementation parity across all phases — lint, duplication, complexity, and completeness checks. Fixes all issues found.",
+      "file": "skills/check.md"
+    }
+  ],
+  "scripts": [
+    {
+      "name": "sdd-implement.sh",
+      "description": "Ralph loop driver — runs AI agent + validation gates in a while loop per phase.",
+      "file": "scripts/sdd-implement.sh"
+    },
+    {
+      "name": "sdd-check.sh",
+      "description": "Plan-vs-implementation verification — audits all phases and fixes issues.",
+      "file": "scripts/sdd-check.sh"
+    },
+    {
+      "name": "lib/gates.sh",
+      "description": "Shared validation gate runners (lint, duplication, tests).",
+      "file": "scripts/lib/gates.sh"
+    },
+    {
+      "name": "lib/prompt-builder.sh",
+      "description": "Constructs agent prompts from SDD plan and ADR files.",
+      "file": "scripts/lib/prompt-builder.sh"
+    }
+  ]
+}

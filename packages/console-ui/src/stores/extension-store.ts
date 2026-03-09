@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { useProjectStore } from "./project-store";
+import { BASE_URL } from "../api/client";
 
 export interface MountedExtension {
   name: string;
@@ -57,10 +57,9 @@ export const useExtensionStore = create<ExtensionStore>()(
       extensions: {},
 
       fetchExtensions: async (projectId: string) => {
-        const { workerPort } = useProjectStore.getState();
         try {
           const response = await fetch(
-            `http://localhost:${workerPort}/api/${projectId}/extensions`
+            `${BASE_URL}/api/${projectId}/extensions`
           );
           if (!response.ok) {
             return;

@@ -13,6 +13,7 @@ export default defineConfig({
     },
   },
   server: {
+    host: "0.0.0.0",
     proxy: {
       "/api": {
         target: "http://localhost:42888",
@@ -23,6 +24,7 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    minify: true,
   },
   optimizeDeps: {
     include: ["react", "react-dom"],

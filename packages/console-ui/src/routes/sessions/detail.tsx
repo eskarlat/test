@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router";
+import { useParams, Link } from "react-router";
 import {
   MessageSquare,
   Wrench,
@@ -7,6 +7,7 @@ import {
   GitBranch,
   Zap,
   Bookmark,
+  ExternalLink,
 } from "lucide-react";
 import { useSessionStore, type TimelineEvent } from "../../stores/session-store";
 import { PageHeader } from "../../components/intelligence/shared/PageHeader";
@@ -208,6 +209,15 @@ export default function SessionTimelinePage() {
               <span className="text-sm text-muted-foreground">
                 {formatDuration(activeSession.startedAt, activeSession.endedAt)}
               </span>
+              {activeSession.agent === "copilot-chat" && projectId && (
+                <Link
+                  to={`/${projectId}/chat/${activeSession.id}`}
+                  className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Open in Chat
+                </Link>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-3">

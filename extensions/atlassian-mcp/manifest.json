@@ -1,0 +1,459 @@
+{
+  "$schema": "https://renre-kit.dev/schemas/manifest.json",
+  "name": "atlassian-mcp",
+  "version": "1.0.0",
+  "displayName": "Atlassian MCP",
+  "description": "Bridge to Atlassian Jira and Confluence via the mcp-atlassian MCP server — search issues, read pages, manage tickets and wiki content.",
+  "author": "renre-kit",
+  "minSdkVersion": "0.1.0",
+  "mcp": {
+    "transport": "stdio",
+    "command": "uvx",
+    "args": ["mcp-atlassian"],
+    "env": {
+      "CONFLUENCE_URL": "${VAULT:atlassian_confluence_url}",
+      "CONFLUENCE_USERNAME": "${VAULT:atlassian_email}",
+      "CONFLUENCE_API_TOKEN": "${VAULT:atlassian_api_token}",
+      "JIRA_URL": "${VAULT:atlassian_jira_url}",
+      "JIRA_USERNAME": "${VAULT:atlassian_email}",
+      "JIRA_API_TOKEN": "${VAULT:atlassian_api_token}"
+    }
+  },
+  "backend": {
+    "entrypoint": "backend/index.js",
+    "actions": [
+      {
+        "name": "list-tools",
+        "description": "List available Atlassian MCP tools",
+        "method": "GET",
+        "path": "/tools"
+      },
+      {
+        "name": "call-tool",
+        "description": "Invoke an Atlassian MCP tool by name",
+        "method": "POST",
+        "path": "/call"
+      },
+      {
+        "name": "list-resources",
+        "description": "List available Atlassian MCP resources",
+        "method": "GET",
+        "path": "/resources"
+      },
+      {
+        "name": "read-resource",
+        "description": "Read a specific Atlassian MCP resource by URI",
+        "method": "GET",
+        "path": "/resource"
+      },
+      {
+        "name": "get-myself",
+        "description": "Get the current Jira user",
+        "method": "GET",
+        "path": "/myself"
+      },
+      {
+        "name": "search-issues",
+        "description": "Search Jira issues by JQL",
+        "method": "GET",
+        "path": "/issues"
+      },
+      {
+        "name": "get-issue",
+        "description": "Get a single Jira issue by key",
+        "method": "GET",
+        "path": "/issues/:key"
+      },
+      {
+        "name": "get-comments",
+        "description": "Get comments on a Jira issue",
+        "method": "GET",
+        "path": "/issues/:key/comments"
+      },
+      {
+        "name": "add-comment",
+        "description": "Add a comment to a Jira issue",
+        "method": "POST",
+        "path": "/issues/:key/comments"
+      },
+      {
+        "name": "chat-search-issues",
+        "description": "Chat tool: search Jira issues by JQL",
+        "method": "POST",
+        "path": "/chat/search-issues"
+      },
+      {
+        "name": "chat-get-issue",
+        "description": "Chat tool: get a Jira issue by key",
+        "method": "POST",
+        "path": "/chat/get-issue"
+      },
+      {
+        "name": "chat-get-issue-comments",
+        "description": "Chat tool: get comments on a Jira issue",
+        "method": "POST",
+        "path": "/chat/get-issue-comments"
+      },
+      {
+        "name": "chat-add-comment",
+        "description": "Chat tool: add a comment to a Jira issue",
+        "method": "POST",
+        "path": "/chat/add-comment"
+      },
+      {
+        "name": "chat-create-issue",
+        "description": "Chat tool: create a new Jira issue",
+        "method": "POST",
+        "path": "/chat/create-issue"
+      },
+      {
+        "name": "chat-update-issue",
+        "description": "Chat tool: update fields on a Jira issue",
+        "method": "POST",
+        "path": "/chat/update-issue"
+      },
+      {
+        "name": "chat-transition-issue",
+        "description": "Chat tool: transition a Jira issue status",
+        "method": "POST",
+        "path": "/chat/transition-issue"
+      },
+      {
+        "name": "chat-assign-issue",
+        "description": "Chat tool: assign a Jira issue",
+        "method": "POST",
+        "path": "/chat/assign-issue"
+      },
+      {
+        "name": "chat-search-users",
+        "description": "Chat tool: search Jira users",
+        "method": "POST",
+        "path": "/chat/search-users"
+      },
+      {
+        "name": "chat-get-transitions",
+        "description": "Chat tool: list available transitions for an issue",
+        "method": "POST",
+        "path": "/chat/get-transitions"
+      }
+    ]
+  },
+  "ui": {
+    "pages": [
+      { "id": "issues", "label": "Issues", "icon": "ticket", "path": "/issues" },
+      { "id": "mentions", "label": "My Activity", "icon": "at-sign", "path": "/mentions" }
+    ],
+    "bundle": "ui/index.js"
+  },
+  "settings": {
+    "schema": [
+      {
+        "key": "atlassian_jira_url",
+        "type": "vault",
+        "label": "Jira Site URL",
+        "description": "Your Atlassian Jira URL (e.g. https://yoursite.atlassian.net).",
+        "required": true
+      },
+      {
+        "key": "atlassian_confluence_url",
+        "type": "vault",
+        "label": "Confluence Site URL",
+        "description": "Your Atlassian Confluence URL (e.g. https://yoursite.atlassian.net/wiki).",
+        "required": true
+      },
+      {
+        "key": "atlassian_email",
+        "type": "vault",
+        "label": "Atlassian Email",
+        "description": "Email address associated with your Atlassian account.",
+        "required": true
+      },
+      {
+        "key": "atlassian_api_token",
+        "type": "vault",
+        "label": "Atlassian API Token",
+        "description": "API token generated at https://id.atlassian.net/manage-profile/security/api-tokens.",
+        "required": true
+      }
+    ]
+  },
+  "permissions": {
+    "mcp": true,
+    "network": ["*.atlassian.net", "*.atlassian.com"],
+    "vault": [
+      "atlassian_jira_url",
+      "atlassian_confluence_url",
+      "atlassian_email",
+      "atlassian_api_token"
+    ]
+  },
+  "skills": [
+    {
+      "name": "atlassian-query",
+      "description": "Teaches LLMs how to query Jira issues, Confluence pages, and other Atlassian resources via renre-kit query.",
+      "file": "skills/atlassian-query.md"
+    }
+  ],
+  "chatTools": [
+    {
+      "name": "search-issues",
+      "description": "Search Jira issues using JQL (Jira Query Language). Returns matching issues with summary, status, assignee, priority, and labels.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "jql": {
+            "type": "string",
+            "description": "JQL query string (e.g. 'project = MYPROJ AND status = \"In Progress\"'). If omitted, returns recently updated issues."
+          },
+          "maxResults": {
+            "type": "number",
+            "description": "Maximum number of results to return (default 20, max 100)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "endpoint": "POST /chat/search-issues"
+    },
+    {
+      "name": "get-issue",
+      "description": "Get detailed information about a specific Jira issue including summary, status, assignee, priority, labels, description, components, and fix versions.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "issueKey": {
+            "type": "string",
+            "description": "The Jira issue key (e.g. 'PROJ-123')."
+          }
+        },
+        "required": ["issueKey"],
+        "additionalProperties": false
+      },
+      "endpoint": "POST /chat/get-issue"
+    },
+    {
+      "name": "get-issue-comments",
+      "description": "Get comments on a Jira issue, ordered by creation date.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "issueKey": {
+            "type": "string",
+            "description": "The Jira issue key (e.g. 'PROJ-123')."
+          },
+          "maxResults": {
+            "type": "number",
+            "description": "Maximum number of comments to return (default 50, max 100)."
+          }
+        },
+        "required": ["issueKey"],
+        "additionalProperties": false
+      },
+      "endpoint": "POST /chat/get-issue-comments"
+    },
+    {
+      "name": "add-comment",
+      "description": "Add a comment to a Jira issue.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "issueKey": {
+            "type": "string",
+            "description": "The Jira issue key (e.g. 'PROJ-123')."
+          },
+          "body": {
+            "type": "string",
+            "description": "The comment text to add."
+          }
+        },
+        "required": ["issueKey", "body"],
+        "additionalProperties": false
+      },
+      "endpoint": "POST /chat/add-comment"
+    },
+    {
+      "name": "create-issue",
+      "description": "Create a new Jira issue in a project.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "projectKey": {
+            "type": "string",
+            "description": "The Jira project key (e.g. 'PROJ')."
+          },
+          "issueType": {
+            "type": "string",
+            "description": "Issue type name (e.g. 'Bug', 'Story', 'Task', 'Epic')."
+          },
+          "summary": {
+            "type": "string",
+            "description": "Issue title/summary."
+          },
+          "description": {
+            "type": "string",
+            "description": "Issue description text."
+          },
+          "priority": {
+            "type": "string",
+            "description": "Priority name (e.g. 'Highest', 'High', 'Medium', 'Low', 'Lowest')."
+          },
+          "labels": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Labels to apply to the issue."
+          },
+          "assigneeAccountId": {
+            "type": "string",
+            "description": "Atlassian account ID of the assignee. Use search-users to find account IDs."
+          }
+        },
+        "required": ["projectKey", "issueType", "summary"],
+        "additionalProperties": false
+      },
+      "endpoint": "POST /chat/create-issue"
+    },
+    {
+      "name": "update-issue",
+      "description": "Update fields on an existing Jira issue. Only specified fields are changed.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "issueKey": {
+            "type": "string",
+            "description": "The Jira issue key (e.g. 'PROJ-123')."
+          },
+          "summary": {
+            "type": "string",
+            "description": "New issue summary/title."
+          },
+          "description": {
+            "type": "string",
+            "description": "New issue description text."
+          },
+          "priority": {
+            "type": "string",
+            "description": "New priority name (e.g. 'High', 'Medium', 'Low')."
+          },
+          "labels": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "New set of labels (replaces existing labels)."
+          },
+          "assigneeAccountId": {
+            "type": "string",
+            "description": "Atlassian account ID of the new assignee."
+          }
+        },
+        "required": ["issueKey"],
+        "additionalProperties": false
+      },
+      "endpoint": "POST /chat/update-issue"
+    },
+    {
+      "name": "transition-issue",
+      "description": "Change a Jira issue's status by performing a workflow transition (e.g. 'To Do' → 'In Progress' → 'Done'). Use get-transitions to see available transitions first.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "issueKey": {
+            "type": "string",
+            "description": "The Jira issue key (e.g. 'PROJ-123')."
+          },
+          "transitionName": {
+            "type": "string",
+            "description": "Name of the transition to perform (e.g. 'Start Progress', 'Done'). Case-insensitive."
+          }
+        },
+        "required": ["issueKey", "transitionName"],
+        "additionalProperties": false
+      },
+      "endpoint": "POST /chat/transition-issue"
+    },
+    {
+      "name": "get-transitions",
+      "description": "List available workflow transitions for a Jira issue. Shows what status changes are possible from the issue's current status.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "issueKey": {
+            "type": "string",
+            "description": "The Jira issue key (e.g. 'PROJ-123')."
+          }
+        },
+        "required": ["issueKey"],
+        "additionalProperties": false
+      },
+      "endpoint": "POST /chat/get-transitions"
+    },
+    {
+      "name": "assign-issue",
+      "description": "Assign a Jira issue to a user, or unassign it by omitting accountId.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "issueKey": {
+            "type": "string",
+            "description": "The Jira issue key (e.g. 'PROJ-123')."
+          },
+          "accountId": {
+            "type": "string",
+            "description": "Atlassian account ID of the user to assign. Omit to unassign."
+          }
+        },
+        "required": ["issueKey"],
+        "additionalProperties": false
+      },
+      "endpoint": "POST /chat/assign-issue"
+    },
+    {
+      "name": "search-users",
+      "description": "Search for Jira users by name or email. Returns account IDs needed for assign-issue and create-issue.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query — matches against user display name and email."
+          },
+          "maxResults": {
+            "type": "number",
+            "description": "Maximum number of results (default 10, max 50)."
+          }
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "endpoint": "POST /chat/search-users"
+    },
+    {
+      "name": "get-myself",
+      "description": "Get the currently authenticated Jira user's profile (display name, email, account ID).",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "endpoint": "GET /myself"
+    }
+  ],
+  "chatAgents": [
+    {
+      "name": "jira-assistant",
+      "displayName": "Jira Assistant",
+      "description": "An AI assistant specialized in Jira project management — search issues, create tickets, manage workflows, and track project progress.",
+      "prompt": "You are a Jira project management assistant. Help the user search for issues, create and update tickets, manage workflows, and track project progress. When searching issues, use JQL syntax. When creating issues, ask for project key and issue type if not provided. When transitioning issues, check available transitions first. Always confirm destructive or status-changing actions before executing them.",
+      "tools": [
+        "search-issues",
+        "get-issue",
+        "get-issue-comments",
+        "add-comment",
+        "create-issue",
+        "update-issue",
+        "transition-issue",
+        "get-transitions",
+        "assign-issue",
+        "search-users",
+        "get-myself"
+      ]
+    }
+  ]
+}

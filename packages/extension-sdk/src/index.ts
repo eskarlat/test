@@ -3,6 +3,7 @@
 
 import type { Router } from "express";
 import type { ComponentType } from "react";
+import type { ScopedScheduler } from "./types/scheduler.js";
 
 export type HookEvent =
   | "sessionStart"
@@ -59,12 +60,111 @@ export interface MCPResource {
   mimeType?: string;
 }
 
+// ---- LLM types (ADR-047 §8: Extension LLM Access) ----
+
+export type ReasoningEffort = "low" | "medium" | "high" | "xhigh";
+
+export interface LLMModelInfo {
+  id: string;
+  name: string;
+  supportsVision: boolean;
+  supportsReasoning: boolean;
+  supportedReasoningEfforts?: ReasoningEffort[];
+  maxContextTokens: number;
+}
+
+export interface LLMAttachment {
+  type: "file" | "directory" | "selection";
+  path: string;
+  displayName?: string;
+}
+
+export interface LLMCompleteRequest {
+  prompt: string;
+  model?: string;
+  reasoningEffort?: ReasoningEffort;
+  systemPrompt?: string;
+  attachments?: LLMAttachment[];
+  maxTokens?: number;
+}
+
+export interface LLMCompleteResponse {
+  content: string;
+  reasoning?: string;
+  model: string;
+  usage: { promptTokens: number; completionTokens: number };
+}
+
+export interface LLMStreamRequest {
+  prompt: string;
+  model?: string;
+  reasoningEffort?: ReasoningEffort;
+  systemPrompt?: string;
+  attachments?: LLMAttachment[];
+  maxTokens?: number;
+}
+
+export type LLMStreamHandler = {
+  onDelta?: (delta: string) => void;
+  onReasoning?: (delta: string) => void;
+  onComplete?: (response: LLMCompleteResponse) => void;
+  onError?: (error: Error) => void;
+};
+
+export interface LLMSessionOpts {
+  model?: string;
+  reasoningEffort?: ReasoningEffort;
+  systemPrompt?: string;
+}
+
+export interface LLMSessionMessage {
+  role: "user" | "assistant";
+  content: string;
+  reasoning?: string;
+  timestamp: number;
+}
+
+export interface LLMSession {
+  readonly sessionId: string;
+  send(prompt: string, attachments?: LLMAttachment[]): Promise<LLMCompleteResponse>;
+  stream(prompt: string, handler: LLMStreamHandler, attachments?: LLMAttachment[]): Promise<void>;
+  getMessages(): Promise<LLMSessionMessage[]>;
+  disconnect(): Promise<void>;
+}
+
+export interface ScopedLLM {
+  listModels(): Promise<LLMModelInfo[]>;
+  complete(request: LLMCompleteRequest): Promise<LLMCompleteResponse>;
+  stream(request: LLMStreamRequest, handler: LLMStreamHandler): Promise<void>;
+  createSession(opts?: LLMSessionOpts): Promise<LLMSession>;
+}
+
+// ---- Chat Tool / Agent types (ADR-047 §9: Extension Tools & Custom Agents) ----
+
+export interface ChatToolDefinition {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+  endpoint: string; // "GET /path" or "POST /path"
+}
+
+export interface ChatAgentDefinition {
+  name: string;
+  displayName: string;
+  description: string;
+  prompt: string;
+  tools: string[];
+}
+
 export interface ExtensionContext {
   projectId: string;
+  projectDir: string;
   db: ScopedDatabase | null;
   logger: ExtensionLogger;
   config: Record<string, string>;
   mcp: MCPClient | null;
+  llm: ScopedLLM | null;
+  scheduler: ScopedScheduler | null;
 }
 
 export interface ExtensionPageProps {
@@ -108,6 +208,8 @@ export interface ExtensionPermissions {
   hooks?: HookEvent[];
   vault?: string[];
   filesystem?: string[];
+  llm?: boolean;
+  scheduler?: boolean;
 }
 
 export interface ExtensionHookConfig {
@@ -213,6 +315,17 @@ export interface ExtensionManifest {
   hooks?: ExtensionHookConfig;
   skills?: SkillDefinition[];
   contextProvider?: ContextProviderManifest;
+  chatTools?: ChatToolDefinition[];
+  chatAgents?: ChatAgentDefinition[];
 }
 
 export { SDK_VERSION } from "./version.js";
+
+// ---- Scheduler types (ADR-050 §16.4) ----
+export type {
+  ScopedScheduler,
+  CronJobOptions,
+  CronJobContext,
+  CronJobInfo,
+  CronJobRun,
+} from "./types/scheduler.js";

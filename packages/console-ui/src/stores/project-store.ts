@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { BASE_URL } from "../api/client";
 
 export interface ActiveProject {
   id: string;
@@ -12,7 +13,6 @@ export interface ActiveProject {
 export interface ProjectStore {
   activeProjectId: string | null;
   projects: ActiveProject[];
-  workerPort: number;
   setActiveProject: (id: string | null) => void;
   fetchProjects: () => Promise<void>;
 }
@@ -22,14 +22,12 @@ export const useProjectStore = create<ProjectStore>()(
     (set, get) => ({
       activeProjectId: null,
       projects: [],
-      workerPort: 42888,
 
       setActiveProject: (id) => set({ activeProjectId: id }),
 
       fetchProjects: async () => {
-        const { workerPort } = get();
         try {
-          const response = await fetch(`http://localhost:${workerPort}/api/projects`);
+          const response = await fetch(`${BASE_URL}/api/projects`);
           if (!response.ok) {
             return;
           }
@@ -53,7 +51,6 @@ export const useProjectStore = create<ProjectStore>()(
       partialize: (state) => ({
         activeProjectId: state.activeProjectId,
         projects: state.projects,
-        workerPort: state.workerPort,
       }),
     }
   )

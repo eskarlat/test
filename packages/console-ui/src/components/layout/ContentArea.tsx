@@ -2,19 +2,23 @@ import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
 function GlobalFallback({ error, resetErrorBoundary }: FallbackProps) {
-  const message = error instanceof Error ? error.message : null;
+  const message = error instanceof Error ? error.message : String(error);
+  const stack = error instanceof Error ? error.stack : undefined;
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
       <AlertTriangle className="h-12 w-12 text-destructive" aria-hidden="true" />
-      <div>
+      <div className="max-w-2xl w-full">
         <h2 className="text-lg font-semibold text-foreground">Something went wrong</h2>
-        <p className="mt-1 text-sm text-muted-foreground max-w-md">
-          An unexpected error occurred. Check the browser console for details.
-        </p>
-        {message && (
-          <pre className="mt-3 text-xs text-left bg-muted rounded p-3 max-w-lg overflow-auto">
-            {message}
-          </pre>
+        <pre className="mt-3 text-xs text-left bg-muted rounded p-3 overflow-auto max-h-60 whitespace-pre-wrap break-words">
+          {message}
+        </pre>
+        {stack && (
+          <details className="mt-2 text-left">
+            <summary className="text-xs text-muted-foreground cursor-pointer">Stack trace</summary>
+            <pre className="mt-1 text-[10px] bg-muted rounded p-2 overflow-auto max-h-40 whitespace-pre-wrap break-words">
+              {stack}
+            </pre>
+          </details>
         )}
       </div>
       <button

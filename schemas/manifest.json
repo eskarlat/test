@@ -126,8 +126,29 @@
         "$ref": "#/$defs/SkillDefinition"
       }
     },
+    "scripts": {
+      "type": "array",
+      "description": "Executable scripts provided by this extension (copied to .renre-kit/scripts/{extension-name}/).",
+      "items": {
+        "$ref": "#/$defs/ScriptDefinition"
+      }
+    },
     "contextProvider": {
       "$ref": "#/$defs/ContextProviderManifest"
+    },
+    "chatTools": {
+      "type": "array",
+      "description": "Chat tools that this extension provides for use in Copilot SDK chat sessions.",
+      "items": {
+        "$ref": "#/$defs/ChatToolDefinition"
+      }
+    },
+    "chatAgents": {
+      "type": "array",
+      "description": "Custom chat agents that this extension provides. Each agent specifies a system prompt and references chatTools by name.",
+      "items": {
+        "$ref": "#/$defs/ChatAgentDefinition"
+      }
     }
   },
   "$defs": {
@@ -332,6 +353,10 @@
             "type": "string"
           },
           "description": "Filesystem paths the extension is permitted to access (glob patterns)."
+        },
+        "llm": {
+          "type": "boolean",
+          "description": "Whether the extension requires LLM access via ScopedLLM proxy."
         }
       }
     },
@@ -393,6 +418,26 @@
         }
       }
     },
+    "ScriptDefinition": {
+      "type": "object",
+      "required": ["name", "description", "file"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Script identifier (used as filename in .renre-kit/scripts/{extension-name}/).",
+          "pattern": "^[a-z][a-z0-9._-]*$"
+        },
+        "description": {
+          "type": "string",
+          "description": "Short description of what this script does."
+        },
+        "file": {
+          "type": "string",
+          "description": "Relative path to the script file within the extension package."
+        }
+      }
+    },
     "ContextProviderManifest": {
       "type": "object",
       "required": ["entrypoint"],
@@ -406,6 +451,62 @@
           "type": "integer",
           "minimum": 1,
           "description": "Maximum token budget this provider may consume."
+        }
+      }
+    },
+    "ChatToolDefinition": {
+      "type": "object",
+      "required": ["name", "description", "parameters", "endpoint"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Tool identifier (alphanumeric + hyphens). Namespaced as {extensionName}__{name} in chat sessions.",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9-]*$"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what the tool does."
+        },
+        "parameters": {
+          "type": "object",
+          "description": "JSON Schema describing the tool's input parameters."
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "HTTP method and path routing to the extension backend (e.g. 'POST /search').",
+          "pattern": "^(GET|POST|PUT|DELETE|PATCH) /"
+        }
+      }
+    },
+    "ChatAgentDefinition": {
+      "type": "object",
+      "required": ["name", "displayName", "description", "prompt", "tools"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Agent identifier.",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9-]*$"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable name shown in the chat agent selector."
+        },
+        "description": {
+          "type": "string",
+          "description": "Short description of what this agent specializes in."
+        },
+        "prompt": {
+          "type": "string",
+          "description": "System prompt override when this agent is selected."
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "References to chatTools by name that this agent can use."
         }
       }
     }

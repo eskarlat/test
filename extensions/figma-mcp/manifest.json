@@ -1,0 +1,67 @@
+{
+  "$schema": "https://renre-kit.dev/schemas/manifest.json",
+  "name": "figma-mcp",
+  "version": "1.0.0",
+  "displayName": "Figma MCP",
+  "description": "Bridge to Figma Desktop's local MCP server over SSE — exposes Figma design file tools and resources via renre-kit query.",
+  "author": "renre-kit",
+  "minSdkVersion": "0.1.0",
+  "mcp": {
+    "transport": "sse",
+    "url": "http://localhost:3845/sse",
+    "reconnect": true,
+    "reconnectIntervalMs": 5000
+  },
+  "backend": {
+    "entrypoint": "backend/index.js",
+    "actions": [
+      {
+        "name": "list-tools",
+        "description": "List available Figma MCP tools",
+        "method": "GET",
+        "path": "/tools"
+      },
+      {
+        "name": "call-tool",
+        "description": "Invoke a Figma MCP tool by name",
+        "method": "POST",
+        "path": "/call"
+      },
+      {
+        "name": "list-resources",
+        "description": "List available Figma MCP resources",
+        "method": "GET",
+        "path": "/resources"
+      },
+      {
+        "name": "read-resource",
+        "description": "Read a specific Figma MCP resource by URI",
+        "method": "GET",
+        "path": "/resource"
+      }
+    ]
+  },
+  "settings": {
+    "schema": [
+      {
+        "key": "figma_mcp_port",
+        "type": "number",
+        "label": "Figma MCP Port",
+        "description": "Port number of the local Figma Desktop MCP server.",
+        "required": false,
+        "default": 3845
+      }
+    ]
+  },
+  "permissions": {
+    "mcp": true,
+    "network": ["localhost"]
+  },
+  "skills": [
+    {
+      "name": "figma-query",
+      "description": "Teaches LLMs how to query Figma design files, components, styles, and variables via renre-kit query.",
+      "file": "skills/figma-query.md"
+    }
+  ]
+}

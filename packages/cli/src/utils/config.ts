@@ -5,6 +5,8 @@ import { DEFAULT_MARKETPLACE_URL } from "../shared/urls.js";
 export interface MarketplaceConfig {
   name: string;
   url: string;
+  /** "url" (default) for remote HTTP marketplaces, "local" for filesystem paths. */
+  type?: "url" | "local";
 }
 
 export interface BackupConfig {

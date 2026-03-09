@@ -24,6 +24,12 @@ const CORE_TABLES = new Set([
   "_context_providers",
   "_prompts_fts",
   "_observations_fts",
+  "_scheduler_jobs",
+  "_scheduler_runs",
+  "_automations",
+  "_automation_runs",
+  "_automation_step_logs",
+  "_automation_tool_calls",
 ]);
 
 const ALLOWED_DDL = /^\s*(CREATE\s+TABLE|CREATE\s+INDEX|ALTER\s+TABLE\s+\S+\s+ADD\s+COLUMN)/i;

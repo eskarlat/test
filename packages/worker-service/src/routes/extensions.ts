@@ -102,7 +102,16 @@ async function doRemount(
 router.get("/api/:projectId/extensions", (req: Request, res: Response) => {
   const { projectId } = req.params;
   if (!requireProject(projectId, res)) return;
-  res.json(listMounted(projectId!));
+  const extensions = listMounted(projectId!);
+  const enriched = extensions.map((ext) => {
+    const manifest = (ext as unknown as { manifest?: { chatTools?: unknown[]; chatAgents?: unknown[] } }).manifest;
+    return {
+      ...ext,
+      chatToolsCount: manifest?.chatTools?.length ?? 0,
+      chatAgentsCount: manifest?.chatAgents?.length ?? 0,
+    };
+  });
+  res.json(enriched);
 });
 
 // POST /api/projects/:id/extensions/reload — remount a specific extension

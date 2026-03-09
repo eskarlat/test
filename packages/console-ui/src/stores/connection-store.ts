@@ -1,25 +1,30 @@
 import { create } from "zustand";
+import { useSocketStore } from "../api/socket";
+
+export type ConnectionStatus = "connected" | "reconnecting" | "disconnected";
 
 export interface ConnectionStore {
-  status: "connected" | "reconnecting" | "disconnected";
-  lastConnectedAt: string | null;
+  status: ConnectionStatus;
   reconnectAttempts: number;
-  setStatus: (status: "connected" | "reconnecting" | "disconnected") => void;
-  incrementReconnectAttempts: () => void;
-  resetReconnectAttempts: () => void;
 }
 
-export const useConnectionStore = create<ConnectionStore>()((set) => ({
-  status: "connected",
-  lastConnectedAt: null,
+export const useConnectionStore = create<ConnectionStore>()(() => ({
+  status: "disconnected",
   reconnectAttempts: 0,
-  setStatus: (status) =>
-    set((state) => ({
-      status,
-      lastConnectedAt:
-        status === "connected" ? new Date().toISOString() : state.lastConnectedAt,
-    })),
-  incrementReconnectAttempts: () =>
-    set((state) => ({ reconnectAttempts: state.reconnectAttempts + 1 })),
-  resetReconnectAttempts: () => set({ reconnectAttempts: 0 }),
 }));
+
+// Sync socket store → connection store
+useSocketStore.subscribe((state) => {
+  let status: ConnectionStatus;
+  if (state.status === "connected") {
+    status = "connected";
+  } else if (state.status === "disconnected") {
+    status = "disconnected";
+  } else {
+    status = "reconnecting";
+  }
+  useConnectionStore.setState({
+    status,
+    reconnectAttempts: state.reconnectAttempts,
+  });
+});

@@ -16,11 +16,11 @@ GET  /api/projects
 GET  /api/vault/keys
 POST /api/vault/secrets
 DELETE /api/vault/secrets/:key
-GET  /api/events                    # SSE stream
-GET  /api/events/history            # Buffered events
 POST /api/errors                    # UI error reports
 GET  /api/marketplace               # Merged marketplace index
 ```
+
+Real-time: Socket.IO (see Socket.IO section below).
 
 ### Extension Route Mounting
 
@@ -49,32 +49,36 @@ The worker mounts it at `/api/{project-id}/{extension-name}/`.
   - Reset on first successful request after cooldown
 - Memory monitoring: log warning if `process.memoryUsage().heapUsed > 512MB`
 
-### SSE Implementation
+### Socket.IO Real-Time (ADR-048)
+
+Server setup: `createServer(app)` + `new Server(httpServer)`, attached in `index.ts`.
 
 ```typescript
-app.get("/api/events", (req, res) => {
-  res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    Connection: "keep-alive",
-  });
+import { createServer } from "http";
+import { Server } from "socket.io";
 
-  const handler = (event: WorkerEvent) => {
-    res.write(`event: ${event.type}\ndata: ${JSON.stringify(event.payload)}\n\n`);
-  };
-
-  eventBus.on("event", handler);
-  // 30s heartbeat
-  const heartbeat = setInterval(() => res.write(": heartbeat\n\n"), 30_000);
-
-  req.on("close", () => {
-    eventBus.off("event", handler);
-    clearInterval(heartbeat);
-  });
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: { origin: "*" },
+  pingInterval: 25000,
+  pingTimeout: 20000,
+  connectionStateRecovery: { maxDisconnectionDuration: 120000 },
 });
+
+attachSocketBridge(io);
+httpServer.listen(port, "127.0.0.1");
 ```
 
-Event types: `project:registered`, `project:unregistered`, `extension:mounted`, `extension:unmounted`, `extension:installed`, `extension:removed`, `extension:upgraded`, `extension:remounted`, `extension:error`, `mcp:connected`, `mcp:disconnected`, `vault:updated`, `updates:available`.
+Room-based event scoping:
+- `system` room — auto-joined on connect. System events: `extension:*`, `project:*`, `mcp:*`, `vault:*`, `updates:*`.
+- `project:{pid}` room — joined/left via `project:join`/`project:leave`. Project events: `session:*`, `observation:*`, `tool:*`, `prompt:*`, `error:*`, `subagent:*`.
+- `chat:{sessionId}` room — joined/left via `chat:join`/`chat:leave`. Chat streaming events.
+
+EventBus → Socket.IO bridge (`socket-bridge.ts`) forwards events to rooms based on event prefix.
+
+Client: `socket.io-client` with Zustand store (`useSocketStore`), transports `["websocket", "polling"]`, auto-reconnect with exponential backoff.
+
+Graceful shutdown: close Socket.IO before HTTP server (`io.close()` → `httpServer.close()`).
 
 ## Process Management
 
@@ -238,9 +242,9 @@ Reject arguments containing shell metacharacters: `;`, `|`, `&`, `` ` ``, `$()`,
 
 ### Entry Point
 
-`~/.renre-kit/scripts/worker-service.cjs` dispatches hook events:
+`~/.renre-kit/scripts/worker-service.cjs` dispatches hook events (ADR-046):
 ```
-node "${RENRE_KIT_ROOT}/scripts/worker-service.cjs" hook <agent> <feature>
+node "${RENRE_KIT_ROOT}/scripts/worker-service.cjs" hook <agent> <event> <feature>
 ```
 
 - Core features: `context-inject`, `tool-governance`, `prompt-journal`, etc.

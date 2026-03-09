@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Settings, AlertCircle, RefreshCw } from "lucide-react";
 import { Skeleton } from "../components/ui/Skeleton";
-import { apiGet } from "../api/client";
+import { apiGet, BASE_URL } from "../api/client";
 
 interface HealthData {
   status: string;
@@ -74,6 +74,7 @@ function ServerInfoContent({ health }: { health: HealthData | null }) {
       {health.memoryUsage && (
         <InfoRow label="Memory" value={formatBytes(health.memoryUsage.heapUsed)} />
       )}
+      <InfoRow label="URL" value={BASE_URL} />
       <InfoRow label="Data Directory" value={globalPath} />
     </div>
   );

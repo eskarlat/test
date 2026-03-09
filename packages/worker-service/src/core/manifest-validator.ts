@@ -26,6 +26,8 @@ const KNOWN_PERMISSION_KEYS = new Set([
   "hooks",
   "vault",
   "filesystem",
+  "llm",
+  "scheduler",
 ]);
 
 export interface ValidationResult {
@@ -255,6 +257,83 @@ function validateSkills(
   }
 }
 
+const VALID_IDENTIFIER_RE = /^[a-zA-Z][a-zA-Z0-9-]*$/;
+const VALID_ENDPOINT_RE = /^(GET|POST|PUT|DELETE|PATCH) \//;
+
+function validateChatTools(
+  tools: Array<Record<string, unknown>>,
+  errors: string[],
+): Set<string> {
+  const names = new Set<string>();
+  for (let i = 0; i < tools.length; i++) {
+    const tool = tools[i];
+    if (!tool) continue;
+
+    const name = String(tool["name"] ?? "");
+    if (!name) {
+      errors.push(`chatTools[${i}]: missing name`);
+    } else if (!VALID_IDENTIFIER_RE.test(name)) {
+      errors.push(`chatTools[${i}]: name must be alphanumeric + hyphens`);
+    } else if (names.has(name)) {
+      errors.push(`chatTools[${i}]: duplicate tool name "${name}"`);
+    } else {
+      names.add(name);
+    }
+
+    if (!tool["description"]) errors.push(`chatTools[${i}]: missing description`);
+
+    if (typeof tool["parameters"] !== "object" || tool["parameters"] === null) {
+      errors.push(`chatTools[${i}]: parameters must be a JSON Schema object`);
+    }
+
+    const endpoint = String(tool["endpoint"] ?? "");
+    if (!endpoint) {
+      errors.push(`chatTools[${i}]: missing endpoint`);
+    } else if (!VALID_ENDPOINT_RE.test(endpoint)) {
+      errors.push(`chatTools[${i}]: endpoint must match "METHOD /path" format`);
+    }
+  }
+  return names;
+}
+
+function validateChatAgents(
+  agents: Array<Record<string, unknown>>,
+  toolNames: Set<string>,
+  errors: string[],
+): void {
+  const names = new Set<string>();
+  for (let i = 0; i < agents.length; i++) {
+    const agent = agents[i];
+    if (!agent) continue;
+
+    const name = String(agent["name"] ?? "");
+    if (!name) {
+      errors.push(`chatAgents[${i}]: missing name`);
+    } else if (!VALID_IDENTIFIER_RE.test(name)) {
+      errors.push(`chatAgents[${i}]: name must be alphanumeric + hyphens`);
+    } else if (names.has(name)) {
+      errors.push(`chatAgents[${i}]: duplicate agent name "${name}"`);
+    } else {
+      names.add(name);
+    }
+
+    if (!agent["displayName"]) errors.push(`chatAgents[${i}]: missing displayName`);
+    if (!agent["description"]) errors.push(`chatAgents[${i}]: missing description`);
+    if (!agent["prompt"]) errors.push(`chatAgents[${i}]: missing prompt`);
+
+    const tools = agent["tools"];
+    if (!Array.isArray(tools)) {
+      errors.push(`chatAgents[${i}]: tools must be an array`);
+    } else {
+      for (const toolRef of tools) {
+        if (!toolNames.has(String(toolRef))) {
+          errors.push(`chatAgents[${i}]: tool "${String(toolRef)}" not found in chatTools`);
+        }
+      }
+    }
+  }
+}
+
 function validateContextProvider(
   contextProvider: Record<string, unknown>,
   backend: Record<string, unknown> | undefined,
@@ -305,6 +384,23 @@ function validateOptionalSections(
 
   const skills = m["skills"] as Array<Record<string, unknown>> | undefined;
   if (Array.isArray(skills)) validateSkills(skills, errors, warnings, extensionDir);
+
+  // Chat tools and agents (ADR-047)
+  const chatTools = m["chatTools"] as Array<Record<string, unknown>> | undefined;
+  let toolNames = new Set<string>();
+  if (Array.isArray(chatTools)) {
+    toolNames = validateChatTools(chatTools, errors);
+  }
+
+  const chatAgents = m["chatAgents"] as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(chatAgents)) {
+    validateChatAgents(chatAgents, toolNames, errors);
+  }
+
+  // Warn if chatTools/chatAgents present but permissions.llm not set
+  if ((chatTools?.length || chatAgents?.length) && !permissions?.["llm"]) {
+    warnings.push("chatTools/chatAgents declared but permissions.llm is not true");
+  }
 
   return { backend, hooks };
 }

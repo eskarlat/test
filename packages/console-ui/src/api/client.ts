@@ -1,13 +1,12 @@
-import { useConnectionStore } from "../stores/connection-store";
-
 // Auto-detect worker port from current URL origin (since worker serves the SPA),
 // or default to 42888 in dev mode.
 function getWorkerBaseUrl(): string {
   if (typeof window !== "undefined") {
     const { port, hostname, protocol } = window.location;
     // If running on a non-standard port (e.g. 5173 in dev), fall back to 42888
+    // Use the current hostname (not "localhost") so it works from remote devices on the network
     if (port === "5173" || port === "3000") {
-      return "http://localhost:42888";
+      return `${protocol}//${hostname}:42888`;
     }
     if (port) {
       return `${protocol}//${hostname}:${port}`;
@@ -27,7 +26,6 @@ export interface ApiResponse<T> {
 
 async function handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
   if (response.ok) {
-    useConnectionStore.getState().setStatus("connected");
     try {
       const data = (await response.json()) as T;
       return { data, error: null, status: response.status };
@@ -37,7 +35,6 @@ async function handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
   }
 
   if (response.status === 503) {
-    useConnectionStore.getState().setStatus("disconnected");
     return { data: null, error: "Server unavailable", status: 503 };
   }
 
@@ -48,10 +45,8 @@ async function handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
 async function executeFetch<T>(url: string, init: RequestInit): Promise<ApiResponse<T>> {
   try {
     const response = await fetch(url, init);
-    useConnectionStore.getState().setStatus("connected");
     return handleResponse<T>(response);
   } catch (err) {
-    useConnectionStore.getState().setStatus("disconnected");
     return {
       data: null,
       error: err instanceof Error ? err.message : "Connection refused",

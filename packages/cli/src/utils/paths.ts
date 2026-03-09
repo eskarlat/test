@@ -44,6 +44,7 @@ export function projectPaths(projectDir: string) {
     hooksDir: join(projectDir, ".github", "hooks"),
     hooksJson: join(projectDir, ".github", "hooks", "renre-kit.json"),
     skillsDir: join(projectDir, ".github", "skills"),
+    scriptsDir: join(base, "scripts"),
     gitignore: join(projectDir, ".gitignore"),
   };
 }

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { WifiOff, RefreshCw, Terminal } from "lucide-react";
 import { useConnectionStore } from "../../stores/connection-store";
+import { useSocketStore } from "../../api/socket";
+import { BASE_URL } from "../../api/client";
 
 export function ReconnectionBanner() {
   const status = useConnectionStore((s) => s.status);
@@ -9,10 +11,8 @@ export function ReconnectionBanner() {
   if (status !== "disconnected") return null;
 
   function handleReconnect() {
-    // Trigger reconnection by resetting attempts — the useWorkerEvents hook will
-    // pick this up via connection store state change and reconnect
-    useConnectionStore.getState().resetReconnectAttempts();
-    useConnectionStore.getState().setStatus("reconnecting");
+    // Reconnect by re-establishing the socket connection
+    useSocketStore.getState().connect(BASE_URL);
   }
 
   return (

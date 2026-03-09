@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
+import { networkInterfaces } from "node:os";
 import * as logger from "../utils/logger.js";
 import { findProjectDir, globalPaths } from "../utils/paths.js";
 import { formatExtensionDetail } from "../utils/formatter.js";
@@ -47,11 +48,15 @@ export function registerStartCommand(program: Command): void {
       await doRegister(project.id, project.name, projectDir, port, interactive);
 
       const consoleUrl = `http://localhost:${port}`;
+      const networkIp = getNetworkAddress();
+      const networkUrl = networkIp ? `http://${networkIp}:${port}` : null;
       if (interactive) {
         logger.outro(`Console running at ${consoleUrl}`);
+        if (networkUrl) logger.info(`Network: ${networkUrl}`);
       } else {
         console.log(`Worker started on port ${port}`);
         console.log(`Console running at ${consoleUrl}`);
+        if (networkUrl) console.log(`Network: ${networkUrl}`);
       }
 
       if (options.browser) openBrowser(consoleUrl);
@@ -87,10 +92,14 @@ async function handleAlreadyRunning(
   if (health) {
     logger.info(`Worker already running on port ${existingState!.port}`);
     await doRegister(project.id, project.name, projectDir, existingState!.port, interactive);
+    const existingNetworkIp = getNetworkAddress();
+    const existingNetworkUrl = existingNetworkIp ? `http://${existingNetworkIp}:${existingState!.port}` : null;
     if (interactive) {
       logger.outro(`Console running at http://localhost:${existingState!.port}`);
+      if (existingNetworkUrl) logger.info(`Network: ${existingNetworkUrl}`);
     } else {
       console.log(`Console running at http://localhost:${existingState!.port}`);
+      if (existingNetworkUrl) console.log(`Network: ${existingNetworkUrl}`);
     }
     return true;
   }
@@ -230,4 +239,15 @@ async function checkForUpdates(projectDir: string): Promise<void> {
       logger.info(`Updates available: ${updates.join(", ")}. Run \`renre-kit marketplace upgrade\` to update.`);
     }
   } catch { /* update check is non-blocking, ignore all errors */ }
+}
+
+function getNetworkAddress(): string | null {
+  const interfaces = networkInterfaces();
+  for (const infos of Object.values(interfaces)) {
+    if (!infos) continue;
+    for (const info of infos) {
+      if (info.family === "IPv4" && !info.internal) return info.address;
+    }
+  }
+  return null;
 }

@@ -5,6 +5,7 @@ import {
   mkdirSync,
   cpSync,
   rmSync,
+  chmodSync,
 } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -40,6 +41,7 @@ interface ManifestLike {
   permissions?: Record<string, unknown>;
   hooks?: { events?: string[] };
   skills?: Array<{ name?: string; file?: string }>;
+  scripts?: Array<{ name?: string; file?: string }>;
 }
 
 function looksLikeTag(version: string): boolean {
@@ -129,6 +131,38 @@ function copySkills(
   }
 }
 
+function copyScripts(
+  projectDir: string,
+  extensionDir: string,
+  extensionName: string,
+  scripts: ManifestLike["scripts"],
+): void {
+  if (!Array.isArray(scripts) || scripts.length === 0) return;
+
+  const paths = projectPaths(projectDir);
+  const destDir = join(paths.scriptsDir, extensionName);
+  mkdirSync(destDir, { recursive: true });
+
+  for (const script of scripts) {
+    const scriptFile = typeof script.file === "string" ? script.file : null;
+    if (!scriptFile) continue;
+
+    const sourcePath = join(extensionDir, scriptFile);
+    if (!existsSync(sourcePath)) continue;
+
+    // Preserve directory structure relative to the script's path in the extension.
+    // e.g. "scripts/lib/gates.sh" → ".renre-kit/scripts/{ext}/lib/gates.sh"
+    const destPath = join(destDir, scriptFile.replace(/^scripts\//, ""));
+    mkdirSync(join(destPath, ".."), { recursive: true });
+    writeFileSync(destPath, readFileSync(sourcePath, "utf8"), "utf8");
+
+    // Make executable on non-Windows
+    if (process.platform !== "win32" && scriptFile.endsWith(".sh")) {
+      chmodSync(destPath, 0o755);
+    }
+  }
+}
+
 export async function validateAndInstall(
   options: InstallOptions,
   interactive: boolean,
@@ -171,6 +205,7 @@ export async function validateAndInstall(
     addExtensionHooks(projectDir, name, manifest.hooks.events, name);
   }
   copySkills(projectDir, extensionDir, manifest.skills);
+  copyScripts(projectDir, extensionDir, String(manifest.name), manifest.scripts);
 
   const extJson = readExtensionsJson(projectDir) ?? { extensions: [] };
   const existingIdx = extJson.extensions.findIndex((e) => e.name === name);
@@ -211,6 +246,15 @@ export function uninstallExtension(projectDir: string, name: string): void {
       rmSync(skillDir, { recursive: true });
     } catch {
       // Non-fatal — skill directory removal failed
+    }
+  }
+
+  const scriptDir = join(paths.scriptsDir, name);
+  if (existsSync(scriptDir)) {
+    try {
+      rmSync(scriptDir, { recursive: true });
+    } catch {
+      // Non-fatal — script directory removal failed
     }
   }
 }

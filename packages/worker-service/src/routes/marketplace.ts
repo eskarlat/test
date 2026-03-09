@@ -18,6 +18,7 @@ import {
 import { eventBus } from "../core/event-bus.js";
 import { logger } from "../core/logger.js";
 import { globalPaths } from "../core/paths.js";
+import { dbManager } from "../core/db-manager.js";
 import { getRegistry as getProjectRegistry } from "./projects.js";
 import { DEFAULT_MARKETPLACE_URL } from "../shared/urls.js";
 
@@ -28,6 +29,7 @@ const router = Router();
 interface MarketplaceConfig {
   name: string;
   url: string;
+  type?: "url" | "local";
 }
 
 interface WorkerConfig {
@@ -522,6 +524,15 @@ router.delete(
       }
     } else {
       removeExtensionHooksFromProject(project.path, name as string);
+    }
+
+    // Delete scheduler cron jobs for this extension
+    try {
+      dbManager.getConnection().prepare(
+        "DELETE FROM _scheduler_jobs WHERE extension_name = ? AND project_id = ?",
+      ).run(name as string, projectId!);
+    } catch {
+      // Non-fatal — table may not exist if scheduler was never used
     }
 
     // Update extensions.json

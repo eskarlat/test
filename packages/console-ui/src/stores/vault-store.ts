@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { useProjectStore } from "./project-store";
+import { BASE_URL } from "../api/client";
 
 export interface VaultStore {
   keys: string[];
@@ -13,10 +13,9 @@ export const useVaultStore = create<VaultStore>()(
       keys: [],
 
       fetchKeys: async () => {
-        const { workerPort } = useProjectStore.getState();
         try {
           const response = await fetch(
-            `http://localhost:${workerPort}/api/vault/keys`
+            `${BASE_URL}/api/vault/keys`
           );
           if (!response.ok) {
             return;

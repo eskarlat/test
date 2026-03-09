@@ -148,6 +148,11 @@ export async function unmountExtension(
   const entry = exts.get(extensionName);
   if (!entry) return;
 
+  // Pause scheduler cron jobs before cleanup
+  if (entry.loaded?.scheduler) {
+    entry.loaded.scheduler.pauseAll();
+  }
+
   exts.delete(extensionName);
 
   unregisterExtensionProvider(extensionName);

@@ -1,0 +1,19 @@
+{
+  "name": "@renre-kit/ext-context7-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Context7 MCP bridge extension for RenRe Kit",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
+  },
+  "dependencies": {
+    "@renre-kit/extension-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0"
+  }
+}

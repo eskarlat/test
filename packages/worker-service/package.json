@@ -2,6 +2,9 @@
   "name": "@renre-kit/worker-service",
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "./dist/index.js",
   "scripts": {
     "build": "tsup",
@@ -9,13 +12,18 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "express": "^4.21.2",
+    "@github/copilot-sdk": "^0.1",
+    "@renre-kit/extension-sdk": "workspace:*",
     "better-sqlite3": "^11.6.0",
-    "@renre-kit/extension-sdk": "workspace:*"
+    "express": "^4.21.2",
+    "node-cron": "^4.2.1",
+    "socket.io": "^4.8"
   },
   "devDependencies": {
-    "@types/express": "^5.0.0",
     "@types/better-sqlite3": "^7.6.12",
+    "@types/express": "^5.0.0",
+    "@types/node-cron": "^3.0.11",
+    "socket.io-client": "^4.8",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

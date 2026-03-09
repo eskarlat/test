@@ -1,0 +1,10 @@
+{
+  "name": "@renre-kit/ext-sdd-workflow",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Structured Design-Driven workflow extension for RenRe Kit — /plan, /implement, /check skills",
+  "dependencies": {
+    "@renre-kit/extension-sdk": "workspace:*"
+  }
+}

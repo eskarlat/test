@@ -16,11 +16,15 @@ import {
   Wrench,
   BookOpen,
   Search,
+  Bot,
+  Timer,
+  GitBranch,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "../../lib/utils";
 import { useProjectStore } from "../../stores/project-store";
 import { useExtensionStore } from "../../stores/extension-store";
+import { useChatStore } from "../../stores/chat-store";
 
 interface StatusIconProps {
   status: string;
@@ -102,9 +106,15 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
       : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
   );
 
-export function Sidebar() {
+interface SidebarProps {
+  onNavigate?: () => void;
+}
+
+export function Sidebar({ onNavigate }: SidebarProps) {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const getExtensionsForProject = useExtensionStore((s) => s.getExtensionsForProject);
+  const bridgeStatus = useChatStore((s) => s.bridgeStatus);
+  const chatDisabled = bridgeStatus !== "ready" && bridgeStatus !== "not-initialized";
 
   const extensions = activeProjectId ? getExtensionsForProject(activeProjectId) : [];
   const extensionsWithUI = extensions.filter(
@@ -112,7 +122,7 @@ export function Sidebar() {
   );
 
   return (
-    <aside className="w-56 flex-shrink-0 border-r border-border bg-background flex flex-col overflow-y-auto">
+    <aside className="w-56 flex-shrink-0 border-r border-border bg-background flex flex-col overflow-y-auto h-full" onClick={onNavigate}>
       {/* Logo */}
       <Link
         to="/"
@@ -161,6 +171,25 @@ export function Sidebar() {
             <NavLink to={`/${activeProjectId}/tool-governance`} className={navLinkClass}>
               <Shield className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
               Tool Governance
+            </NavLink>
+            <NavLink
+              to={`/${activeProjectId}/chat`}
+              className={chatDisabled ? () => cn(
+                "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors",
+                "text-muted-foreground/50 cursor-not-allowed",
+              ) : navLinkClass}
+              title={chatDisabled ? "Copilot CLI required" : undefined}
+            >
+              <Bot className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+              Chat
+            </NavLink>
+            <NavLink to={`/${activeProjectId}/automations`} className={navLinkClass}>
+              <Timer className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+              Automations
+            </NavLink>
+            <NavLink to={`/${activeProjectId}/worktrees`} className={navLinkClass}>
+              <GitBranch className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+              Worktrees
             </NavLink>
 
             {/* Extension sections */}

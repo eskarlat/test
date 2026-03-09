@@ -13,6 +13,7 @@ import {
   isCacheStale,
   type MarketplaceCache,
 } from "../services/marketplace-client.js";
+import { isLocalPath } from "../shared/urls.js";
 import {
   validateAndInstall,
   uninstallExtension,
@@ -343,9 +344,11 @@ function runRegister(url: string, opts: { name: string }): void {
     log.warn(`Marketplace "${opts.name}" already registered.`);
     return;
   }
-  config.marketplaces.push({ name: opts.name, url });
+  const type = isLocalPath(url) ? "local" as const : "url" as const;
+  config.marketplaces.push({ name: opts.name, url, type });
   writeConfig(config);
-  log.success(`Registered marketplace "${opts.name}" at ${url}`);
+  const label = type === "local" ? "local path" : "URL";
+  log.success(`Registered marketplace "${opts.name}" (${label}) at ${url}`);
 }
 
 function runUnregister(name: string): void {
@@ -366,8 +369,8 @@ function runListSources(): void {
     log.info("No marketplaces configured.");
     return;
   }
-  const rows = config.marketplaces.map((m) => [m.name, m.url]);
-  console.log(formatTable(["Name", "URL"], rows));
+  const rows = config.marketplaces.map((m) => [m.name, m.type ?? "url", m.url]);
+  console.log(formatTable(["Name", "Type", "URL / Path"], rows));
 }
 
 export function registerMarketplaceCommand(program: Command): void {
@@ -432,11 +435,11 @@ export function registerMarketplaceCommand(program: Command): void {
 
   // marketplace register
   mp
-    .command("register <url>")
-    .description("Register a new marketplace source")
+    .command("register <url-or-path>")
+    .description("Register a new marketplace source (URL or local path)")
     .requiredOption("--name <name>", "Name for the marketplace")
-    .action((url: string, opts: { name: string }) => {
-      runRegister(url, opts);
+    .action((urlOrPath: string, opts: { name: string }) => {
+      runRegister(urlOrPath, opts);
     });
 
   // marketplace unregister

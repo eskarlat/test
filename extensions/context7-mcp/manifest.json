@@ -1,0 +1,54 @@
+{
+  "$schema": "https://renre-kit.dev/schemas/manifest.json",
+  "name": "context7-mcp",
+  "version": "1.0.0",
+  "displayName": "Context7 MCP",
+  "description": "Bridge to Context7 — fetch up-to-date, version-specific documentation for any library directly into your prompt context.",
+  "author": "renre-kit",
+  "minSdkVersion": "0.1.0",
+  "mcp": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "@upstash/context7-mcp@latest"]
+  },
+  "backend": {
+    "entrypoint": "backend/index.js",
+    "actions": [
+      {
+        "name": "list-tools",
+        "description": "List available Context7 MCP tools",
+        "method": "GET",
+        "path": "/tools"
+      },
+      {
+        "name": "call-tool",
+        "description": "Invoke a Context7 MCP tool by name",
+        "method": "POST",
+        "path": "/call"
+      },
+      {
+        "name": "list-resources",
+        "description": "List available Context7 MCP resources",
+        "method": "GET",
+        "path": "/resources"
+      },
+      {
+        "name": "read-resource",
+        "description": "Read a specific Context7 MCP resource by URI",
+        "method": "GET",
+        "path": "/resource"
+      }
+    ]
+  },
+  "permissions": {
+    "mcp": true,
+    "network": ["context7.com", "*.context7.com"]
+  },
+  "skills": [
+    {
+      "name": "context7-query",
+      "description": "Teaches LLMs how to look up library documentation via Context7 using renre-kit query.",
+      "file": "skills/context7-query.md"
+    }
+  ]
+}

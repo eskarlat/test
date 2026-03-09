@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url";
 import { logger } from "./core/logger.js";
 import healthRouter from "./routes/health.js";
 import projectsRouter from "./routes/projects.js";
-import eventsRouter from "./routes/events.js";
 import errorsRouter from "./routes/errors.js";
 import backupRouter from "./routes/backup.js";
 import vaultRouter from "./routes/vault.js";
@@ -30,6 +29,10 @@ import toolAnalyticsRouter from "./routes/tool-analytics.js";
 import subagentsRouter from "./routes/subagents.js";
 import contextRecipeRouter from "./routes/context-recipe.js";
 import searchRouter from "./routes/search.js";
+import { chatRouter, projectChatRouter } from "./routes/chat.js";
+import worktreeRouter from "./routes/worktrees.js";
+import automationRouter from "./routes/automations.js";
+import extCronRouter from "./routes/ext-cron.js";
 import { registerBuiltInProviders } from "./core/context-recipe-engine.js";
 import { seedBuiltinRules } from "./core/tool-governance.js";
 
@@ -75,7 +78,6 @@ export function createApp(): express.Application {
   // Core routes
   app.use(healthRouter);
   app.use(projectsRouter);
-  app.use(eventsRouter);
   app.use(errorsRouter);
   app.use(backupRouter);
   app.use(vaultRouter);
@@ -96,6 +98,11 @@ export function createApp(): express.Application {
   app.use(subagentsRouter);
   app.use(contextRecipeRouter);
   app.use(searchRouter);
+  app.use(chatRouter);
+  app.use(projectChatRouter);
+  app.use(worktreeRouter);
+  app.use(automationRouter);
+  app.use(extCronRouter);
   // Actions discovery route (must come before extension router)
   app.use(actionsRouteMiddleware);
   // MCP bridge routes (must come before extension router, after core routes)
