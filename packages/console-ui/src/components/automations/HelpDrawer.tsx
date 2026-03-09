@@ -112,8 +112,12 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
               </thead>
               <tbody className="text-muted-foreground">
                 <tr className="border-b border-border/50">
-                  <td className="py-1.5 pr-3"><code className={codeClass}>{"{{previous_output}}"}</code></td>
-                  <td className="py-1.5">Output from the immediately preceding step</td>
+                  <td className="py-1.5 pr-3"><code className={codeClass}>{"{{prev.output}}"}</code></td>
+                  <td className="py-1.5">Previous step&apos;s full response</td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="py-1.5 pr-3"><code className={codeClass}>{"{{prev.json.field}}"}</code></td>
+                  <td className="py-1.5">JSON field from previous step (dot-notation)</td>
                 </tr>
                 <tr className="border-b border-border/50">
                   <td className="py-1.5 pr-3"><code className={codeClass}>{"{{steps.NAME.output}}"}</code></td>
@@ -132,16 +136,24 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
                   <td className="py-1.5">Current project ID</td>
                 </tr>
                 <tr className="border-b border-border/50">
-                  <td className="py-1.5 pr-3"><code className={codeClass}>{"{{timestamp}}"}</code></td>
-                  <td className="py-1.5">Current ISO 8601 timestamp</td>
+                  <td className="py-1.5 pr-3"><code className={codeClass}>{"{{now}}"}</code></td>
+                  <td className="py-1.5">Current ISO 8601 datetime</td>
                 </tr>
                 <tr className="border-b border-border/50">
-                  <td className="py-1.5 pr-3"><code className={codeClass}>{"{{date}}"}</code></td>
+                  <td className="py-1.5 pr-3"><code className={codeClass}>{"{{now.date}}"}</code></td>
                   <td className="py-1.5">Current date (YYYY-MM-DD)</td>
                 </tr>
+                <tr className="border-b border-border/50">
+                  <td className="py-1.5 pr-3"><code className={codeClass}>{"{{now.time}}"}</code></td>
+                  <td className="py-1.5">Current time (HH:MM:SS)</td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="py-1.5 pr-3"><code className={codeClass}>{"{{worktree.path}}"}</code></td>
+                  <td className="py-1.5">Worktree directory (when enabled)</td>
+                </tr>
                 <tr>
-                  <td className="py-1.5 pr-3"><code className={codeClass}>{"{{run_id}}"}</code></td>
-                  <td className="py-1.5">Unique ID for this automation run</td>
+                  <td className="py-1.5 pr-3"><code className={codeClass}>{"{{worktree.branch}}"}</code></td>
+                  <td className="py-1.5">Worktree branch name (when enabled)</td>
                 </tr>
               </tbody>
             </table>

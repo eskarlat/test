@@ -82,6 +82,7 @@ interface UserInputResponse {
 // ---------------------------------------------------------------------------
 
 const LOG_SOURCE = "copilot-bridge";
+
 const CALLBACK_TIMEOUT_MS = 30_000;
 const RETRY_DELAYS_MS = [1_000, 5_000, 15_000];
 const MAX_RETRIES = RETRY_DELAYS_MS.length;

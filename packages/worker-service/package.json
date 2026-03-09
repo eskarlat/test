@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@github/copilot": "^1.0.2",
     "@github/copilot-sdk": "^0.1",
     "@renre-kit/extension-sdk": "workspace:*",
     "better-sqlite3": "^11.6.0",
