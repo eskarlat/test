@@ -73,7 +73,7 @@ This produces a single `localStorage` entry:
 | `renre-chat-global-preferences` | Global | ADR-052 | `{ toolDisplayMode }` |
 | `renre-chat-layout:{projectId}` | Per-project | ADR-052 §2.4 | Serialized layout tree + pane→session map |
 
-#### 1.3 Setting UI Location
+#### 1.2 Setting UI Location
 
 The tool display mode selector lives in the **Chat page header bar** (alongside model selector and effort selector from ADR-047 §6.3). It uses a segmented control or dropdown:
 
@@ -85,7 +85,13 @@ The tool display mode selector lives in the **Chat page header bar** (alongside 
 
 Also accessible from Console UI **Settings** page under "Chat" section for discoverability.
 
-#### 1.4 Rendering by Display Mode
+**Model/Effort selectors in multi-pane context**: ADR-047's `selectedModel` and `selectedEffort` are project-level defaults applied when **creating new sessions**. Once a session is created, its model is fixed (owned by the Copilot SDK session). In multi-pane mode:
+
+- The **header bar** Model/Effort selectors set the default for the **next new session** (unchanged from ADR-047)
+- Each **pane header** (`ChatPaneHeader`) displays the model name of its active session as a **read-only badge** (e.g., "sonnet-4-6") — not editable, since the model is bound at session creation
+- When a pane shows the `ChatSessionPickerDialog` (no session assigned), the "Create new session" option uses the current header bar defaults
+
+#### 1.3 Rendering by Display Mode
 
 The `ChatToolExecution` component reads `toolDisplayMode` from `useChatGlobalPreferencesStore` and renders accordingly:
 
@@ -135,7 +141,36 @@ The `ChatToolExecution` component reads `toolDisplayMode` from `useChatGlobalPre
 - Shows: everything — full arguments, streaming partial output during execution, complete detailed result
 - This is the current ADR-047 behavior (no change)
 
-#### 1.5 Tool Intent Generation
+#### 1.3.1 ToolCallRound Rendering by Display Mode
+
+ADR-047 §6.5 groups concurrent tool calls sharing the same `roundId` into a **ToolCallRound card**. Display mode affects how rounds render:
+
+**Compact mode** — Round collapses into a single summary line when all tools complete:
+```
+┌──────────────────────────────────────────────────┐
+│ 🔧 3 tools (read_file, grep, glob) ✓ 45ms       │  ← Collapsed round
+└──────────────────────────────────────────────────┘
+```
+While running, each tool in the round shows its own compact line (with spinner). Once all complete, the round auto-collapses to the summary. Users can click to expand and see individual tool lines.
+
+**Standard mode** — Each tool in the round renders its own standard card, grouped inside a round container with a subtle left border:
+```
+┌─ Round (3 tools, 45ms) ─────────────────────────┐
+│ ┌──────────────────────────────────────────────┐ │
+│ │ 🔧 read_file         12ms                    │ │
+│ │ Path: src/index.ts — 42 lines read           │ │
+│ └──────────────────────────────────────────────┘ │
+│ ┌──────────────────────────────────────────────┐ │
+│ │ 🔧 grep              28ms                    │ │
+│ │ Pattern: "TODO" — 7 matches                  │ │
+│ └──────────────────────────────────────────────┘ │
+│ ...                                              │
+└──────────────────────────────────────────────────┘
+```
+
+**Verbose mode** — Unchanged from ADR-047. Individual tool cards grouped by round, all expanded.
+
+#### 1.4 Tool Intent Generation
 
 Each tool call in compact/standard mode needs a human-readable intent string. This is derived from a static mapping + argument inspection:
 
@@ -160,7 +195,7 @@ function defaultIntent(toolName: string, args: Record<string, unknown>): string 
 }
 ```
 
-#### 1.6 Tool Display Config (Standard Mode Arguments)
+#### 1.5 Tool Display Config (Standard Mode Arguments)
 
 ```typescript
 // src/utils/tool-display-config.ts
@@ -190,6 +225,34 @@ const toolDisplayConfigs: Record<string, ToolDisplayConfig> = {
   // Extension tools fall back to showing first 2 arguments
 };
 ```
+
+#### 1.6 Extension & MCP Tool Display Registration
+
+Built-in tools have hardcoded `toolIntentMap` and `toolDisplayConfigs` entries. Extension and MCP tools need a way to provide their own display metadata. This is done via the extension **manifest** (ADR-019, ADR-020):
+
+```jsonc
+// manifest.json — new optional "toolDisplay" field per tool
+{
+  "tools": [
+    {
+      "name": "deploy",
+      "description": "Deploy to staging or production",
+      "toolDisplay": {
+        "intent": "Deploy to {{environment}}",    // Mustache-style template over argument names
+        "keyArgs": ["environment", "branch"],
+        "resultSummary": "short"                  // "short" = first line of result, "full" = omit (use verbose)
+      }
+    }
+  ]
+}
+```
+
+**Resolution order** for tool intent / display config:
+1. Built-in `toolIntentMap` / `toolDisplayConfigs` (highest priority — hardcoded, optimized)
+2. Extension manifest `toolDisplay` field (loaded at extension mount time)
+3. Fallback: `defaultIntent()` using `humanize(toolName)` + first argument value (§1.4)
+
+MCP tools (ADR-008) do not have a manifest entry for display config — they always use the fallback. A future ADR could extend MCP tool metadata with display hints if needed.
 
 ### 2. Multi-Session Split View
 
@@ -311,12 +374,61 @@ SplitNode(vertical, 0.5)
 
 #### 2.4 Layout Persistence
 
+The layout store uses Zustand's `persist` middleware with a **per-project** localStorage key. `focusedPaneId` is excluded from persistence — it is transient UI state that defaults to the first pane on restore.
+
 ```typescript
-// localStorage key
-"renre-chat-layout:{projectId}"    // Serialized LayoutNode tree + pane→session mappings
+const useChatLayoutStore = create<ChatLayoutState>()(
+  persist(
+    (set, get) => ({
+      layout: { type: "leaf", paneId: "pane-1" },
+      panes: { "pane-1": { id: "pane-1", sessionId: null } },
+      focusedPaneId: "pane-1",
+
+      splitPane: (paneId, direction) => { /* ... */ },
+      closePane: (paneId) => { /* ... */ },
+      setSessionForPane: (paneId, sessionId) => { /* ... */ },
+      setFocusedPane: (paneId) => set({ focusedPaneId: paneId }),
+      setSplitRatio: (path, ratio) => { /* ... */ },
+      resetLayout: () => set({
+        layout: { type: "leaf", paneId: "pane-1" },
+        panes: { "pane-1": { id: "pane-1", sessionId: null } },
+        focusedPaneId: "pane-1",
+      }),
+    }),
+    {
+      name: `renre-chat-layout:${projectId}`,  // Per-project key
+      partialize: (state) => ({
+        layout: state.layout,
+        panes: state.panes,
+        // focusedPaneId excluded — transient UI state
+      }),
+    }
+  )
+);
 ```
 
-Layout is restored when navigating back to the Chat page for a project.
+**Stale session recovery**: When the layout is restored from localStorage, pane `sessionId` references may point to sessions that no longer exist (e.g., Copilot CLI was reset, sessions were deleted). On restore, the store runs a validation pass:
+
+```typescript
+// Called after store hydration and after sessions list is fetched
+function validateRestoredLayout(
+  panes: Record<string, PaneState>,
+  validSessionIds: Set<string>
+): Record<string, PaneState> {
+  const validated: Record<string, PaneState> = {};
+  for (const [id, pane] of Object.entries(panes)) {
+    validated[id] = {
+      ...pane,
+      sessionId: pane.sessionId && validSessionIds.has(pane.sessionId)
+        ? pane.sessionId
+        : null,  // Reset to session picker
+    };
+  }
+  return validated;
+}
+```
+
+Panes with invalidated sessions show the `ChatSessionPickerDialog` instead of a broken empty chat.
 
 #### 2.5 Chat Store Refactoring
 
@@ -421,12 +533,17 @@ Each pane header also has:
 - **Close button** (×): Closes this pane (if more than one pane exists)
 - **Notification badges**: Amber dot for pending permission/input, green dot for active streaming
 
-Keyboard shortcuts:
+**Pane close behavior**: Closing a pane **does not** stop or delete its session. The pane leaves the Socket.IO room (`chat:leave`), and the layout tree is pruned, but the CopilotBridge session continues running on the worker. If the session was streaming, it keeps streaming — results are buffered server-side and delivered when the user reopens that session in any pane. If a session is actively awaiting user permission when its pane is closed, the request times out according to the CopilotBridge's permission timeout (ADR-047 §11). A confirmation dialog is shown before closing a pane with a pending permission request to warn the user.
+
+Keyboard shortcuts (use `Cmd` on macOS):
+
 - `Ctrl+\` — Split right
 - `Ctrl+Shift+\` — Split down
-- `Ctrl+W` — Close focused pane (with confirmation if session is streaming)
-- `Ctrl+1/2/3/4` — Focus pane by index
-- `Ctrl+Tab` — Cycle focus between panes
+- `Ctrl+Shift+W` — Close focused pane (with confirmation if session is streaming). Uses `Shift` modifier to avoid conflicting with the browser's `Ctrl+W` (close tab).
+- `Alt+1/2/3/4` — Focus pane by index. Uses `Alt` to avoid conflicting with browser tab switching (`Ctrl+1-9`).
+- `Alt+[` / `Alt+]` — Cycle focus between panes (previous / next). Avoids `Ctrl+Tab` which browsers reserve for tab switching.
+
+> **Browser shortcut conflicts**: `Ctrl+W`, `Ctrl+Tab`, and `Ctrl+1-9` are reserved by browsers and cannot be reliably intercepted by web applications. All pane shortcuts use `Alt` or `Ctrl+Shift` modifiers to avoid collisions.
 
 #### 2.9 Responsive Behavior
 
