@@ -146,8 +146,8 @@ const toolIntentMap: Record<string, (args: Record<string, unknown>) => string> =
   read_file: (args) => `Read ${shortenPath(args.file_path as string)}`,
   edit_file: (args) => `Edit ${shortenPath(args.file_path as string)}`,
   write_file: (args) => `Write ${shortenPath(args.file_path as string)}`,
-  bash: (args) => `Run \`${truncate(args.command as string, 40)}\``,
-  grep: (args) => `Search for "${truncate(args.pattern as string, 30)}"`,
+  bash: (args) => "Run `" + truncate(args.command as string, 40) + "`",
+  grep: (args) => "Search for \"" + truncate(args.pattern as string, 30) + "\"",
   glob: (args) => `Find files matching ${args.pattern}`,
   list_directory: (args) => `List ${shortenPath(args.path as string)}`,
   // ... extensible for extension tools and MCP tools
