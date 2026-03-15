@@ -366,7 +366,7 @@ Each `ChatPane` reads from `sessionStates.get(sessionId)` for its streaming/tool
 
 #### 2.6 Socket.IO Room Management
 
-When a pane is assigned a session, it joins that session's room. When a pane switches sessions or closes, it leaves the room:
+When a pane is assigned a session, it joins that session's room. When a pane switches sessions or closes, it leaves the room. Uses the existing `chat:join`/`chat:leave` events from `socket-bridge.ts` (ADR-048 §5) which accept a plain `sessionId` string — the server handles the `chat:${sessionId}` room mapping internally:
 
 ```typescript
 // In ChatPane.tsx — on mount / session change
@@ -374,15 +374,15 @@ useEffect(() => {
   if (!sessionId) return;
 
   const socket = useSocketStore.getState().socket;
-  socket?.emit("join-room", `chat:${sessionId}`);
+  socket?.emit("chat:join", sessionId);
 
   return () => {
-    socket?.emit("leave-room", `chat:${sessionId}`);
+    socket?.emit("chat:leave", sessionId);
   };
 }, [sessionId]);
 ```
 
-Multiple panes can show the **same session** (e.g., for monitoring a long-running session in a larger pane while working in another). The Socket.IO room join is idempotent — joining the same room twice from the same socket is a no-op.
+Multiple panes can show the **same session** (e.g., for monitoring a long-running session in a larger pane while working in another). The server-side `chat:join` handler calls `socket.join(`chat:${sessionId}`)` internally — joining the same room twice from the same socket is a no-op.
 
 #### 2.7 Independent Session Resolution
 
