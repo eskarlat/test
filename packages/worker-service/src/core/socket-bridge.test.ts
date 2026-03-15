@@ -5,6 +5,17 @@ import { io as ioClient, type Socket as ClientSocket } from "socket.io-client";
 import { eventBus } from "./event-bus.js";
 import { attachSocketBridge, isSystemEvent, isProjectEvent } from "./socket-bridge.js";
 
+// Mock copilot-bridge
+vi.mock("./copilot-bridge.js", () => ({
+  copilotBridge: {
+    sendMessage: vi.fn().mockResolvedValue(undefined),
+    cancelGeneration: vi.fn().mockResolvedValue(undefined),
+    resolvePermission: vi.fn(),
+    resolveInput: vi.fn(),
+    resolveElicitation: vi.fn(),
+  },
+}));
+
 // Suppress logger output in tests
 vi.mock("./logger.js", () => ({
   logger: {
@@ -168,15 +179,18 @@ describe("socket-bridge", () => {
   });
 
   describe("chat stubs", () => {
-    it("returns error for chat:send", async () => {
+    it("returns error for chat:send when not joined to session", async () => {
       const client = createClient();
       await connectAndWaitReady(client);
 
-      const errorPromise = waitForEvent<{ message: string }>(client, "error");
-      client.emit("chat:send", { text: "hello" });
-      const error = await errorPromise;
+      const result = await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+        client.emit("chat:send", { prompt: "hello" }, (res: { ok: boolean; error?: string }) => {
+          resolve(res);
+        });
+      });
 
-      expect(error.message).toBe("Chat not available");
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe("Not joined to a chat session");
     });
   });
 });

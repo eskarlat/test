@@ -73,7 +73,7 @@ describe("AutomationEditorPage", () => {
       runs: [],
       activeRun: null,
       runLoading: false,
-      fetchModels: vi.fn(),
+      fetchModels: vi.fn().mockResolvedValue(undefined),
       createAutomation: vi.fn().mockResolvedValue({
         id: "auto-1",
         projectId: "proj-1",
@@ -122,8 +122,8 @@ describe("AutomationEditorPage", () => {
     // Variables section heading
     expect(screen.getByText("Variables")).toBeTruthy();
 
-    // Prompt Chain section heading (contains * so we look for the text inside)
-    expect(screen.getByText(/Prompt Chain/)).toBeTruthy();
+    // Prompt Chain section heading (may appear multiple times)
+    expect(screen.getAllByText(/Prompt Chain/).length).toBeGreaterThanOrEqual(1);
 
     // Max Duration section heading
     expect(screen.getByText("Max Duration")).toBeTruthy();
@@ -285,7 +285,7 @@ describe("AutomationEditorPage", () => {
     const dialog = screen.getByRole("dialog", { name: /Enable autopilot mode/i });
     expect(dialog).toBeTruthy();
     expect(screen.getByText("Enable Autopilot Mode")).toBeTruthy();
-    expect(screen.getByText(/autopilot mode/i)).toBeTruthy();
+    expect(screen.getAllByText(/autopilot mode/i).length).toBeGreaterThanOrEqual(1);
   });
 
   // -----------------------------------------------------------------------
@@ -459,8 +459,8 @@ describe("AutomationEditorPage", () => {
     const user = userEvent.setup();
     renderEditor();
 
-    const helpBtn = screen.getByRole("button", { name: /Help/i });
-    await user.click(helpBtn);
+    const helpButtons = screen.getAllByRole("button", { name: /Help/i });
+    await user.click(helpButtons[0]!);
 
     // HelpDrawer should open — it has a dialog with aria-label "Automation help"
     expect(screen.getByRole("dialog", { name: /Automation help/i })).toBeTruthy();

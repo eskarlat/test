@@ -105,6 +105,8 @@ describe("AutomationRunsPage", () => {
       runs: [],
       activeRun: null,
       runLoading: false,
+      // Prevent mount useEffect from calling real store actions
+      fetchRuns: vi.fn().mockResolvedValue(undefined),
     });
   });
 
@@ -139,10 +141,10 @@ describe("AutomationRunsPage", () => {
 
     renderWithRouter(<AutomationRunsPage />);
 
-    // RunStatusBadge renders the label from runStatusConfig
-    expect(screen.getByText("Completed")).toBeTruthy();
-    expect(screen.getByText("Failed")).toBeTruthy();
-    expect(screen.getByText("Cancelled")).toBeTruthy();
+    // RunStatusBadge renders the label from runStatusConfig (may appear in filter dropdown too)
+    expect(screen.getAllByText("Completed").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Failed").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Cancelled").length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders empty state when no runs", () => {

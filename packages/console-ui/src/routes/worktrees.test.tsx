@@ -73,6 +73,10 @@ describe("WorktreesPage", () => {
       worktreeCount: 0,
       loading: false,
       error: null,
+      // Prevent mount useEffect from calling real store actions that set loading=true
+      fetchWorktrees: vi.fn().mockResolvedValue(undefined),
+      fetchDiskUsage: vi.fn().mockResolvedValue(undefined),
+      triggerCleanup: vi.fn().mockResolvedValue({ removed: 0 }),
     });
   });
 
