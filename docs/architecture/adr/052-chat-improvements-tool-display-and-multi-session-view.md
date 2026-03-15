@@ -27,34 +27,23 @@ Standard    │  Tool name + intent + arguments summary + result summary
 Verbose     │  Full arguments, streaming partial output, detailed result (current behavior)
 ```
 
-#### 1.1 Setting Storage
+#### 1.1 Settings Store
 
-Stored in `localStorage` as a global user preference (not per-project, not per-session):
-
-```typescript
-// localStorage key
-"renre-chat-tool-display-mode"   // "compact" | "standard" | "verbose"
-```
-
-Default: `"standard"`.
-
-#### 1.2 Settings Store Extension
-
-Extend the existing Zustand preferences store (or create a new `chat-preferences-store`):
+A dedicated Zustand store with `persist` middleware owns all **global** (not per-project) chat preferences. It persists to `localStorage` under the key `renre-chat-global-preferences` — deliberately namespaced with `global` to avoid collision with ADR-047's per-project `renre-chat-preferences:{projectId}` key (which stores model and effort selections).
 
 ```typescript
-// src/stores/chat-preferences-store.ts
+// src/stores/chat-global-preferences-store.ts
 
 type ToolDisplayMode = "compact" | "standard" | "verbose";
 
-interface ChatPreferencesState {
+interface ChatGlobalPreferencesState {
   toolDisplayMode: ToolDisplayMode;
 
   // Actions
   setToolDisplayMode(mode: ToolDisplayMode): void;
 }
 
-const useChatPreferencesStore = create<ChatPreferencesState>()(
+const useChatGlobalPreferencesStore = create<ChatGlobalPreferencesState>()(
   persist(
     (set) => ({
       toolDisplayMode: "standard",
@@ -62,12 +51,27 @@ const useChatPreferencesStore = create<ChatPreferencesState>()(
       setToolDisplayMode: (mode) => set({ toolDisplayMode: mode }),
     }),
     {
-      name: "renre-chat-preferences",
+      name: "renre-chat-global-preferences",  // localStorage key
       partialize: (state) => ({ toolDisplayMode: state.toolDisplayMode }),
     }
   )
 );
 ```
+
+This produces a single `localStorage` entry:
+
+```json
+// localStorage["renre-chat-global-preferences"]
+{ "state": { "toolDisplayMode": "standard" }, "version": 0 }
+```
+
+**Key namespace summary** (across ADR-047 and this ADR):
+
+| Key | Scope | Owner | Contents |
+|-----|-------|-------|----------|
+| `renre-chat-preferences:{projectId}` | Per-project | ADR-047 | `{ model, effort }` |
+| `renre-chat-global-preferences` | Global | ADR-052 | `{ toolDisplayMode }` |
+| `renre-chat-layout:{projectId}` | Per-project | ADR-052 §2.4 | Serialized layout tree + pane→session map |
 
 #### 1.3 Setting UI Location
 
@@ -83,7 +87,7 @@ Also accessible from Console UI **Settings** page under "Chat" section for disco
 
 #### 1.4 Rendering by Display Mode
 
-The `ChatToolExecution` component reads `toolDisplayMode` from the preferences store and renders accordingly:
+The `ChatToolExecution` component reads `toolDisplayMode` from `useChatGlobalPreferencesStore` and renders accordingly:
 
 **Compact mode:**
 ```
@@ -454,7 +458,7 @@ ChatPage
 
 ```
 src/stores/
-  chat-preferences-store.ts         — Tool display mode + future chat preferences
+  chat-global-preferences-store.ts  — Tool display mode + future global chat preferences
   chat-layout-store.ts              — Split layout tree, pane→session mapping
 
 src/components/chat/
@@ -481,7 +485,7 @@ The changes are **additive** — no existing APIs or Socket.IO events change:
 | `streamingContent`, `isStreaming` (top-level) | Moved into per-session `SessionStreamState` |
 | `ChatPage` renders single `ChatMessageList` | `ChatPage` renders `ChatLayoutRenderer` which recurses into `ChatPane` components |
 | `renre-chat-active-session:{pid}` localStorage | Replaced by `renre-chat-layout:{pid}` which includes all pane→session assignments |
-| `ChatToolExecution` rendering | Now reads `toolDisplayMode` from preferences store; delegates to compact/standard/verbose renderer |
+| `ChatToolExecution` rendering | Now reads `toolDisplayMode` from `useChatGlobalPreferencesStore`; delegates to compact/standard/verbose renderer |
 | `chat:send` Socket.IO event | Unchanged — but now multiple panes may emit concurrently for different sessions |
 
 ### 6. Constraints & Limits
