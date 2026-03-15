@@ -281,8 +281,8 @@ interface LeafNode {
 type LayoutNode = SplitNode | LeafNode;
 
 interface ChatLayoutState {
-  layout: LayoutNode;           // Tree structure representing the split layout
-  panes: Map<string, PaneState>;
+  layout: LayoutNode;                      // Tree structure representing the split layout
+  panes: Record<string, PaneState>;        // Plain object — JSON-serializable for localStorage
   focusedPaneId: string;
 
   // Actions
@@ -294,6 +294,8 @@ interface ChatLayoutState {
   resetLayout(): void;          // Back to single pane
 }
 ```
+
+`panes` uses `Record<string, PaneState>` (not `Map`) so the entire `ChatLayoutState` is directly JSON-serializable by Zustand's `persist` middleware without custom `storage.serialize`/`deserialize` functions. The `LayoutNode` tree is also plain objects, so the full state round-trips through `JSON.stringify`/`JSON.parse` cleanly.
 
 The layout is a **binary tree** of split nodes with leaf panes. This naturally supports any combination of splits up to the 4-pane maximum.
 
@@ -319,6 +321,8 @@ Layout is restored when navigating back to the Chat page for a project.
 #### 2.5 Chat Store Refactoring
 
 The existing `chat-store` (ADR-047 §6.4) assumes a single `activeSessionId`. With multi-pane, multiple sessions are active simultaneously. Key changes:
+
+> **Note on `Map` usage**: The chat-store is **not persisted** to `localStorage` — it is runtime-only state rebuilt from Socket.IO events and REST calls on page load (ADR-047 §10). `Map` is appropriate here since JSON serializability is not required. This contrasts with `chat-layout-store` (§2.3) which uses `Record` for its persisted fields.
 
 ```typescript
 // Updated chat-store.ts
