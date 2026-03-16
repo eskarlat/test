@@ -145,6 +145,10 @@ describe("AutomationRunDetailPage", () => {
       runs: [],
       activeRun: makeRunDetail(),
       runLoading: false,
+      // Prevent the component's useEffect from calling the real store actions
+      // which would overwrite activeRun with the mocked apiGet response
+      fetchRunDetails: vi.fn().mockResolvedValue(undefined),
+      cancelRun: vi.fn().mockResolvedValue(undefined),
     });
   });
 
@@ -156,11 +160,11 @@ describe("AutomationRunDetailPage", () => {
     // part won't appear, but the run number portion should.
     expect(screen.getByText(/Run #run-1/)).toBeTruthy();
 
-    // Status badge should show "Completed"
-    expect(screen.getByText("Completed")).toBeTruthy();
+    // Status badge should show "Completed" (may appear multiple times in the UI)
+    expect(screen.getAllByText("Completed").length).toBeGreaterThanOrEqual(1);
 
     // Duration should appear (300000ms = 5m 0s)
-    expect(screen.getByText("5m 0s")).toBeTruthy();
+    expect(screen.getAllByText("5m 0s").length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders step names in steps section", () => {
@@ -169,9 +173,9 @@ describe("AutomationRunDetailPage", () => {
     // The Steps section heading
     expect(screen.getByText("Steps")).toBeTruthy();
 
-    // Step names rendered in the StepDetail collapsible headers
-    expect(screen.getByText("Gather Info")).toBeTruthy();
-    expect(screen.getByText("Write Report")).toBeTruthy();
+    // Step names rendered in the StepDetail collapsible headers (may also appear in timeline)
+    expect(screen.getAllByText("Gather Info").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Write Report").length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders chain timeline with step labels", () => {
@@ -195,7 +199,7 @@ describe("AutomationRunDetailPage", () => {
       activeRun: makeRunDetail({
         worktree: {
           worktreeId: "wt-1",
-          path: "/tmp/worktrees/auto-1", // eslint-disable-line sonarjs/publicly-writable-directories
+          path: "/tmp/worktrees/auto-1",
           branch: "auto/daily-review",
           status: "cleaned_up",
         },
@@ -346,21 +350,21 @@ describe("AutomationRunDetailPage", () => {
     renderWithRouter(<AutomationRunDetailPage />);
 
     // With a single step, it is auto-expanded; the Prompt tab is active by default
-    expect(screen.getByText("Analyze the codebase")).toBeTruthy();
+    expect(screen.getAllByText("Analyze the codebase").length).toBeGreaterThanOrEqual(1);
 
     // Switch to Response tab
     const responseTab = screen.getByRole("button", { name: "Response" });
     await user.click(responseTab);
-    expect(screen.getByText("Found 5 issues")).toBeTruthy();
+    expect(screen.getAllByText("Found 5 issues").length).toBeGreaterThanOrEqual(1);
 
     // Switch to Tools tab
     const toolsTab = screen.getByRole("button", { name: "Tools (1)" });
     await user.click(toolsTab);
-    expect(screen.getByText("read_file")).toBeTruthy();
+    expect(screen.getAllByText("read_file").length).toBeGreaterThanOrEqual(1);
 
     // Switch to Debug tab
     const debugTab = screen.getByRole("button", { name: "Debug" });
     await user.click(debugTab);
-    expect(screen.getByText("claude-3-opus")).toBeTruthy();
+    expect(screen.getAllByText("claude-3-opus").length).toBeGreaterThanOrEqual(1);
   });
 });

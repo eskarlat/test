@@ -139,19 +139,21 @@ export default function IssuesPage({ apiBaseUrl }: ExtensionPageProps) {
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        {loading ? (
+        {loading && (
           <div className="p-6 space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="h-12 bg-muted animate-pulse rounded" />
             ))}
           </div>
-        ) : error ? (
+        )}
+        {!loading && error && (
           <div className="p-6">
             <div className="rounded-md bg-destructive/10 border border-destructive/20 p-4 text-sm text-destructive">
               {error}
             </div>
           </div>
-        ) : issues.length === 0 ? (
+        )}
+        {!loading && !error && issues.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -171,7 +173,8 @@ export default function IssuesPage({ apiBaseUrl }: ExtensionPageProps) {
             <p className="text-sm">No issues found</p>
             <p className="text-xs mt-1">Try adjusting your JQL query</p>
           </div>
-        ) : (
+        )}
+        {!loading && !error && issues.length > 0 && (
           <>
             {/* Results header */}
             <div className="px-4 py-2 text-xs text-muted-foreground border-b border-border bg-muted/30">

@@ -1,6 +1,7 @@
 // backend/src/index.ts
 import { Router } from "express";
 function createJiraClient(config) {
+  // eslint-disable-next-line sonarjs/slow-regex
   const baseUrl = config["atlassian_jira_url"]?.replace(/\/+$/, "");
   const email = config["atlassian_email"];
   const token = config["atlassian_api_token"];

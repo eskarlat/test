@@ -45,7 +45,7 @@ function makeWorktree(overrides: Partial<Worktree> = {}): Worktree {
     id: "wt-1",
     projectId: "proj-1",
     branch: "feature/test",
-    path: "/tmp/worktrees/wt-1", // eslint-disable-line sonarjs/publicly-writable-directories
+    path: "/tmp/worktrees/wt-1",
     status: "ready",
     cleanupPolicy: "always",
     createdBy: { type: "user" },
@@ -73,6 +73,10 @@ describe("WorktreesPage", () => {
       worktreeCount: 0,
       loading: false,
       error: null,
+      // Prevent mount useEffect from calling real store actions that set loading=true
+      fetchWorktrees: vi.fn().mockResolvedValue(undefined),
+      fetchDiskUsage: vi.fn().mockResolvedValue(undefined),
+      triggerCleanup: vi.fn().mockResolvedValue({ removed: 0 }),
     });
   });
 

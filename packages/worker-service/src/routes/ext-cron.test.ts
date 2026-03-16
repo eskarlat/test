@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import express from "express";
-import { createServer } from "node:http";
 import Database from "better-sqlite3";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -17,6 +16,7 @@ vi.mock("../core/logger.js", () => ({
 }));
 
 import extCronRouter, { setExtCronDb } from "./ext-cron.js";
+import { request } from "../test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -123,40 +123,6 @@ function insertRun(
     row.id, row.job_id, row.extension_name, row.project_id,
     row.status, row.started_at, row.completed_at, row.duration_ms, row.error,
   );
-}
-
-async function request(
-  app: express.Application,
-  method: "GET" | "POST",
-  url: string,
-  body?: Record<string, unknown>,
-): Promise<{ status: number; body: unknown }> {
-  const server = createServer(app);
-  const port = await new Promise<number>((resolve, reject) => {
-    server.listen(0, () => {
-      const addr = server.address();
-      if (!addr || typeof addr === "string") {
-        server.close();
-        reject(new Error("no address"));
-        return;
-      }
-      resolve(addr.port);
-    });
-  });
-  const fetchOpts: RequestInit = { method };
-  if (body) {
-    fetchOpts.headers = { "Content-Type": "application/json" };
-    fetchOpts.body = JSON.stringify(body);
-  }
-  try {
-    const res = await fetch(`http://localhost:${port}${url}`, fetchOpts);
-    const json = await res.json().catch(() => null);
-    server.close();
-    return { status: res.status, body: json };
-  } catch (err) {
-    server.close();
-    throw err;
-  }
 }
 
 // ---------------------------------------------------------------------------

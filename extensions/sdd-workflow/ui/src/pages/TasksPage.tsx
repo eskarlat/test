@@ -42,12 +42,12 @@ function ProgressBar({ completed, total }: { completed: number; total: number })
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const colors =
-    status === "Completed"
-      ? "bg-green-500/10 text-green-600 dark:text-green-400"
-      : status === "In Progress"
-        ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
-        : "bg-muted text-muted-foreground";
+  let colors = "bg-muted text-muted-foreground";
+  if (status === "Completed") {
+    colors = "bg-green-500/10 text-green-600 dark:text-green-400";
+  } else if (status === "In Progress") {
+    colors = "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400";
+  }
   return (
     <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${colors}`}>
       {status}

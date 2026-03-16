@@ -15,6 +15,60 @@ import { ChatElicitationDialog } from "../components/chat/ChatElicitationDialog"
 import type { ChatMessage, ContentBlock } from "../types/chat";
 
 // ---------------------------------------------------------------------------
+// Block-update helpers (extracted to reduce nesting depth in SSE handlers)
+// ---------------------------------------------------------------------------
+
+function updateToolBlock(
+  msg: ChatMessage,
+  toolCallId: string,
+  patch: Record<string, unknown>,
+): ChatMessage {
+  if (msg.role !== "assistant") return msg;
+  const blockIdx = msg.blocks.findIndex(
+    (b) => b.type === "tool-execution" && b.toolCallId === toolCallId,
+  );
+  if (blockIdx < 0) return msg;
+  const blocks = [...msg.blocks];
+  blocks[blockIdx] = { ...blocks[blockIdx], ...patch } as ContentBlock;
+  return { ...msg, blocks };
+}
+
+function updateSubagentBlock(
+  msg: ChatMessage,
+  toolCallId: string,
+  patch: Record<string, unknown>,
+): ChatMessage {
+  if (msg.role !== "assistant") return msg;
+  const blockIdx = msg.blocks.findIndex(
+    (b) => b.type === "subagent" && b.toolCallId === toolCallId,
+  );
+  if (blockIdx < 0) return msg;
+  const blocks = [...msg.blocks];
+  blocks[blockIdx] = { ...blocks[blockIdx], ...patch } as ContentBlock;
+  return { ...msg, blocks };
+}
+
+function applyToolBlockUpdate(
+  messages: Map<string, ChatMessage[]>,
+  sid: string,
+  toolCallId: string,
+  patch: Record<string, unknown>,
+): void {
+  const list = messages.get(sid) ?? [];
+  messages.set(sid, list.map((msg) => updateToolBlock(msg, toolCallId, patch)));
+}
+
+function applySubagentBlockUpdate(
+  messages: Map<string, ChatMessage[]>,
+  sid: string,
+  toolCallId: string,
+  patch: Record<string, unknown>,
+): void {
+  const list = messages.get(sid) ?? [];
+  messages.set(sid, list.map((msg) => updateSubagentBlock(msg, toolCallId, patch)));
+}
+
+// ---------------------------------------------------------------------------
 // Top-level stable selectors (avoid inline arrow fns that create new refs)
 // ---------------------------------------------------------------------------
 
@@ -229,41 +283,28 @@ function useChatSocket(sessionId: string | null): void {
 
     function handleToolComplete(data: { toolCallId: string; toolName?: string; result?: Record<string, unknown>; success?: boolean; error?: unknown }): void {
       if (!sessionId) return;
+      const resultObj = data.result ?? {};
+      // Extract content string: prefer .content if it's a string, else JSON-serialize
+      const resultContent = typeof resultObj === "object" && resultObj !== null && "content" in resultObj && typeof (resultObj as Record<string, unknown>).content === "string"
+        ? (resultObj as Record<string, unknown>).content as string
+        : JSON.stringify(resultObj, null, 2);
+      const errorValue = typeof data.error === "object" ? JSON.stringify(data.error) : String(data.error);
+      const errorStr = data.error ? errorValue : undefined;
+
       useChatStore.setState((s) => {
         const tools = new Map(s.activeTools);
         const tracked = tools.get(data.toolCallId);
         const duration = tracked ? Date.now() - tracked.startedAt : undefined;
         tools.delete(data.toolCallId);
 
+        const patch = {
+          status: (data.success === false ? "error" : "complete") as string,
+          result: { content: resultContent },
+          ...(errorStr ? { error: errorStr } : {}),
+          ...(duration != null ? { duration } : {}),
+        };
         const msgs = new Map(s.messages);
-        const list = msgs.get(sessionId!) ?? [];
-        const updatedList = list.map((msg) => {
-          if (msg.role !== "assistant") return msg;
-          const blockIdx = msg.blocks.findIndex(
-            (b) => b.type === "tool-execution" && b.toolCallId === data.toolCallId,
-          );
-          if (blockIdx < 0) return msg;
-          const oldBlock = msg.blocks[blockIdx] as import("../types/chat").ToolExecutionBlock;
-          const resultObj = data.result ?? {};
-          // Extract content string: prefer .content if it's a string, else JSON-serialize
-          const resultContent = typeof resultObj === "object" && resultObj !== null && "content" in resultObj && typeof (resultObj as Record<string, unknown>).content === "string"
-            ? (resultObj as Record<string, unknown>).content as string
-            : JSON.stringify(resultObj, null, 2);
-          const errorStr = data.error
-            ? (typeof data.error === "object" ? JSON.stringify(data.error) : String(data.error))
-            : undefined;
-          const newBlock: ContentBlock = {
-            ...oldBlock,
-            status: data.success === false ? "error" : "complete",
-            result: { content: resultContent },
-            ...(errorStr ? { error: errorStr } : {}),
-            ...(duration != null ? { duration } : {}),
-          };
-          const blocks = [...msg.blocks];
-          blocks[blockIdx] = newBlock;
-          return { ...msg, blocks };
-        });
-        msgs.set(sessionId!, updatedList);
+        applyToolBlockUpdate(msgs, sessionId!, data.toolCallId, patch);
         return { activeTools: tools, messages: msgs };
       });
     }
@@ -301,25 +342,12 @@ function useChatSocket(sessionId: string | null): void {
         const duration = tracked ? Date.now() - tracked.startedAt : undefined;
         subs.delete(data.toolCallId);
 
+        const subPatch: Partial<ContentBlock> = {
+          status: "complete",
+          ...(duration != null ? { duration } : {}),
+        };
         const msgs = new Map(s.messages);
-        const list = msgs.get(sessionId!) ?? [];
-        const updatedList = list.map((msg) => {
-          if (msg.role !== "assistant") return msg;
-          const blockIdx = msg.blocks.findIndex(
-            (b) => b.type === "subagent" && b.toolCallId === data.toolCallId,
-          );
-          if (blockIdx < 0) return msg;
-          const oldBlock = msg.blocks[blockIdx] as import("../types/chat").SubagentBlock;
-          const newBlock: ContentBlock = {
-            ...oldBlock,
-            status: "complete",
-            ...(duration != null ? { duration } : {}),
-          };
-          const blocks = [...msg.blocks];
-          blocks[blockIdx] = newBlock;
-          return { ...msg, blocks };
-        });
-        msgs.set(sessionId!, updatedList);
+        applySubagentBlockUpdate(msgs, sessionId!, data.toolCallId, subPatch);
         return { activeSubagents: subs, messages: msgs };
       });
     }
@@ -514,7 +542,7 @@ export default function ChatPage() {
   const { projectId, sessionId } = useParams<{ projectId: string; sessionId?: string }>();
   const navigate = useNavigate();
   const bridgeStatus = useChatStore(selectBridgeStatus);
-  const sessions = useChatStore(selectSessions);
+  const _sessions = useChatStore(selectSessions);
   const sessionsFetched = useChatStore(selectSessionsFetched);
   const sessionError = useChatStore(selectSessionError);
   const pendingPermission = useChatStore(selectPendingPermission);

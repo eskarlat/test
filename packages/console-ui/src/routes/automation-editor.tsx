@@ -232,7 +232,7 @@ function StepEditorBody({ step, index, models, update, updateTools, onChange }: 
               if (val) {
                 update({ maxTokens: parseInt(val, 10) });
               } else {
-                const { maxTokens: _, ...rest } = step;
+                const { maxTokens: _maxTokens, ...rest } = step;
                 onChange(index, rest as PromptStep);
               }
             }}
@@ -314,7 +314,7 @@ function StepEditorBody({ step, index, models, update, updateTools, onChange }: 
             if (val) {
               update({ timeoutMs: parseFloat(val) * 1000 });
             } else {
-              const { timeoutMs: _, ...rest } = step;
+              const { timeoutMs: _timeoutMs, ...rest } = step;
               onChange(index, rest as PromptStep);
             }
           }}
@@ -797,7 +797,7 @@ export default function AutomationEditorPage() {
                     setSchedule((prev) => ({ ...prev, timezone: val }));
                   } else {
                     setSchedule((prev) => {
-                      const { timezone: _, ...rest } = prev;
+                      const { timezone: _timezone, ...rest } = prev;
                       return rest as AutomationSchedule;
                     });
                   }
@@ -849,7 +849,7 @@ export default function AutomationEditorPage() {
                       setWorktree((prev) => ({ ...prev, branch: val }));
                     } else {
                       setWorktree((prev) => {
-                        const { branch: _, ...rest } = prev;
+                        const { branch: _branch, ...rest } = prev;
                         return rest as WorktreeConfig;
                       });
                     }
@@ -901,7 +901,7 @@ export default function AutomationEditorPage() {
                         setWorktree((prev) => ({ ...prev, ttlMs: parseFloat(val) * 3_600_000 }));
                       } else {
                         setWorktree((prev) => {
-                          const { ttlMs: _, ...rest } = prev;
+                          const { ttlMs: _ttlMs, ...rest } = prev;
                           return rest as WorktreeConfig;
                         });
                       }

@@ -19,14 +19,12 @@ vi.mock("./logger.js", () => ({
   },
 }));
 
-// eslint-disable-next-line sonarjs/publicly-writable-directories
 vi.mock("./paths.js", () => ({
-  // eslint-disable-next-line sonarjs/publicly-writable-directories
   globalPaths: () => ({
-    globalDir: "/tmp/renre-kit-test", // eslint-disable-line sonarjs/publicly-writable-directories
-    configFile: "/tmp/renre-kit-test/config.json", // eslint-disable-line sonarjs/publicly-writable-directories
-    dataDb: "/tmp/renre-kit-test/data.db", // eslint-disable-line sonarjs/publicly-writable-directories
-    logsDir: "/tmp/renre-kit-test/logs", // eslint-disable-line sonarjs/publicly-writable-directories
+    globalDir: "/tmp/renre-kit-test",
+    configFile: "/tmp/renre-kit-test/config.json",
+    dataDb: "/tmp/renre-kit-test/data.db",
+    logsDir: "/tmp/renre-kit-test/logs",
   }),
 }));
 
@@ -650,6 +648,210 @@ describe("ScopedScheduler", () => {
       ).run("alien-runs", "proj-1", "alien-ext", "job-3", "0 * * * *", new Date().toISOString(), new Date().toISOString());
 
       await expect(scheduler.runs("alien-runs")).rejects.toThrow("does not own");
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Concurrency limits
+  // -----------------------------------------------------------------------
+
+  describe("concurrency limits", () => {
+    it("skips execution when per-extension concurrent limit (2) is reached", async () => {
+      // Create a job whose callback blocks until we resolve
+      let resolveBlock1!: () => void;
+      let resolveBlock2!: () => void;
+      const block1 = new Promise<void>((r) => { resolveBlock1 = r; });
+      const block2 = new Promise<void>((r) => { resolveBlock2 = r; });
+      const cb3 = vi.fn().mockResolvedValue(undefined);
+
+      const id1 = await scheduler.register({
+        name: "concurrent-1",
+        cron: "0 * * * *",
+        callback: vi.fn().mockReturnValue(block1),
+      });
+      const id2 = await scheduler.register({
+        name: "concurrent-2",
+        cron: "0 * * * *",
+        callback: vi.fn().mockReturnValue(block2),
+      });
+      const id3 = await scheduler.register({
+        name: "concurrent-3",
+        cron: "0 * * * *",
+        callback: cb3,
+      });
+
+      // Start two jobs — they will be "running" (pending promises)
+      const exec1 = scheduler.executeJob(id1);
+      const exec2 = scheduler.executeJob(id2);
+
+      // Third should be skipped due to per-extension limit
+      await scheduler.executeJob(id3);
+      expect(cb3).not.toHaveBeenCalled();
+
+      // Clean up
+      resolveBlock1();
+      resolveBlock2();
+      await exec1;
+      await exec2;
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // estimateMinIntervalMinutes (tested via register)
+  // -----------------------------------------------------------------------
+
+  describe("cron interval validation", () => {
+    it("allows */1 minute cron (min interval is 1)", async () => {
+      // */1 means every minute, which equals minIntervalMinutes (1)
+      const id = await scheduler.register({
+        name: "every-minute",
+        cron: "* * * * *",
+        callback: vi.fn().mockResolvedValue(undefined),
+      });
+      expect(id).toBeDefined();
+    });
+
+    it("allows comma-separated minute list with gap >= 1", async () => {
+      const id = await scheduler.register({
+        name: "comma-job",
+        cron: "0,30 * * * *",
+        callback: vi.fn().mockResolvedValue(undefined),
+      });
+      expect(id).toBeDefined();
+    });
+
+    it("allows once-per-hour cron", async () => {
+      const id = await scheduler.register({
+        name: "hourly-job",
+        cron: "15 * * * *",
+        callback: vi.fn().mockResolvedValue(undefined),
+      });
+      expect(id).toBeDefined();
+    });
+
+    it("allows once-per-day cron", async () => {
+      const id = await scheduler.register({
+        name: "daily-job",
+        cron: "0 9 * * *",
+        callback: vi.fn().mockResolvedValue(undefined),
+      });
+      expect(id).toBeDefined();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // list() includes nextRunAt from computeNextRunAt
+  // -----------------------------------------------------------------------
+
+  describe("list() with nextRunAt", () => {
+    it("includes nextRunAt for step-based cron expressions", async () => {
+      await scheduler.register({
+        name: "step-job",
+        cron: "*/5 * * * *",
+        callback: vi.fn().mockResolvedValue(undefined),
+      });
+
+      const jobs = await scheduler.list();
+      const job = jobs.find((j) => j.name === "step-job");
+      expect(job).toBeDefined();
+      // nextRunAt should be a valid ISO string
+      expect(job!.nextRunAt).toBeDefined();
+      expect(new Date(job!.nextRunAt!).getTime()).toBeGreaterThan(0);
+    });
+
+    it("includes nextRunAt for every-minute cron", async () => {
+      await scheduler.register({
+        name: "minute-job",
+        cron: "* * * * *",
+        callback: vi.fn().mockResolvedValue(undefined),
+      });
+
+      const jobs = await scheduler.list();
+      const job = jobs.find((j) => j.name === "minute-job");
+      expect(job!.nextRunAt).toBeDefined();
+    });
+
+    it("includes nextRunAt for fixed-minute cron", async () => {
+      await scheduler.register({
+        name: "fixed-min-job",
+        cron: "30 * * * *",
+        callback: vi.fn().mockResolvedValue(undefined),
+      });
+
+      const jobs = await scheduler.list();
+      const job = jobs.find((j) => j.name === "fixed-min-job");
+      expect(job!.nextRunAt).toBeDefined();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // executeJob edge cases
+  // -----------------------------------------------------------------------
+
+  describe("executeJob() edge cases", () => {
+    it("does nothing for a non-existent job ID", async () => {
+      await expect(scheduler.executeJob("non-existent-id")).resolves.not.toThrow();
+    });
+
+    it("emits scheduler:run-completed event on success", async () => {
+      const jobId = await scheduler.register({
+        name: "emit-test",
+        cron: "0 * * * *",
+        callback: vi.fn().mockResolvedValue(undefined),
+      });
+
+      await scheduler.executeJob(jobId);
+
+      expect(mockIO._emitFn).toHaveBeenCalledWith(
+        "scheduler:run-completed",
+        expect.objectContaining({
+          jobId,
+          status: "completed",
+        }),
+      );
+    });
+
+    it("emits scheduler:run-completed event on failure", async () => {
+      const jobId = await scheduler.register({
+        name: "fail-emit-test",
+        cron: "0 * * * *",
+        callback: vi.fn().mockRejectedValue(new Error("oops")),
+      });
+
+      await scheduler.executeJob(jobId);
+
+      expect(mockIO._emitFn).toHaveBeenCalledWith(
+        "scheduler:run-completed",
+        expect.objectContaining({
+          jobId,
+          status: "failed",
+        }),
+      );
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Socket.IO emission error resilience
+  // -----------------------------------------------------------------------
+
+  describe("emitEvent error resilience", () => {
+    it("does not throw when Socket.IO emit throws", async () => {
+      const brokenIO = createMockIO();
+      brokenIO._toFn.mockImplementation(() => {
+        throw new Error("Socket.IO is broken");
+      });
+
+      const brokenScheduler = makeScheduler(db, brokenIO);
+
+      // register calls emitEvent — should not throw
+      const id = await brokenScheduler.register({
+        name: "broken-io-job",
+        cron: "0 * * * *",
+        callback: vi.fn().mockResolvedValue(undefined),
+      });
+      expect(id).toBeDefined();
+
+      brokenScheduler.stopAll();
     });
   });
 });

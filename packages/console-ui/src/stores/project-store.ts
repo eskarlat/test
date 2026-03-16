@@ -19,7 +19,7 @@ export interface ProjectStore {
 
 export const useProjectStore = create<ProjectStore>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       activeProjectId: null,
       projects: [],
 

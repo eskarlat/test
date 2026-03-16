@@ -87,7 +87,7 @@ chatRouter.get("/api/chat/status", (_req: Request, res: Response) => {
     const status = copilotBridge.getStatus();
     // Kick off initialization if not started yet (fire-and-forget)
     if (status.status === "not-initialized") {
-      void copilotBridge.ensureStarted().catch(() => {});
+      copilotBridge.ensureStarted().catch(() => {});
     }
     res.json(copilotBridge.getStatus());
   } catch (err: unknown) {

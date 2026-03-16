@@ -111,7 +111,7 @@ export default function TaskDetailPage({
     (lineNumber: number, content: string) => {
       if (!selectedPath) return;
       const comment: InlineComment = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id: crypto.randomUUID(),
         lineNumber,
         content,
         createdAt: new Date().toISOString(),
@@ -195,13 +195,12 @@ export default function TaskDetailPage({
           )}
           <button
             onClick={() => setShowReview(!showReview)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              showReview
-                ? "bg-primary text-primary-foreground"
-                : totalComments > 0
-                  ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/20"
-                  : "bg-muted text-muted-foreground hover:bg-accent"
-            }`}
+            className={(() => {
+              const base = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors";
+              if (showReview) return `${base} bg-primary text-primary-foreground`;
+              if (totalComments > 0) return `${base} bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/20`;
+              return `${base} bg-muted text-muted-foreground hover:bg-accent`;
+            })()}
           >
             Review
             {totalComments > 0 && (
@@ -232,7 +231,7 @@ export default function TaskDetailPage({
 
         {/* File viewer */}
         <div className="flex-1 flex overflow-hidden">
-          {selectedPath && fileContent ? (
+          {selectedPath && fileContent && (
             <div className="flex-1 overflow-hidden">
               <MarkdownViewer
                 content={fileContent.content}
@@ -243,11 +242,13 @@ export default function TaskDetailPage({
                 fileUpdated={fileUpdated}
               />
             </div>
-          ) : fileLoading ? (
+          )}
+          {!(selectedPath && fileContent) && fileLoading && (
             <div className="flex-1 flex items-center justify-center">
               <span className="text-sm text-muted-foreground">Loading file...</span>
             </div>
-          ) : (
+          )}
+          {!(selectedPath && fileContent) && !fileLoading && (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
                 <p className="text-muted-foreground text-sm">Select a file to view</p>

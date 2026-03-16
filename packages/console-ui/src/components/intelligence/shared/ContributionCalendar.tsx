@@ -9,7 +9,9 @@ interface ContributionCalendarProps {
   label?: string;
 }
 
-function getIntensity(count: number, max: number): 0 | 1 | 2 | 3 | 4 {
+type Intensity = 0 | 1 | 2 | 3 | 4;
+
+function getIntensity(count: number, max: number): Intensity {
   if (count === 0 || max === 0) return 0;
   const ratio = count / max;
   if (ratio <= 0.15) return 1;
@@ -18,7 +20,7 @@ function getIntensity(count: number, max: number): 0 | 1 | 2 | 3 | 4 {
   return 4;
 }
 
-const INTENSITY_CLASSES: Record<0 | 1 | 2 | 3 | 4, string> = {
+const INTENSITY_CLASSES: Record<Intensity, string> = {
   0: "fill-muted/40",
   1: "fill-primary/20",
   2: "fill-primary/45",

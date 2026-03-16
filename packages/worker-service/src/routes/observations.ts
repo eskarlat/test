@@ -3,7 +3,6 @@ import {
   create,
   list,
   updateObservation,
-  archiveObservation,
   deleteObservation,
   getObservationStats,
 } from "../core/observations-service.js";

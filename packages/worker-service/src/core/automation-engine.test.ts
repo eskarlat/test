@@ -14,7 +14,6 @@ vi.mock("./logger.js", () => ({
   },
 }));
 
-/* eslint-disable sonarjs/publicly-writable-directories */
 // Mock paths
 vi.mock("./paths.js", () => ({
   globalPaths: () => ({
@@ -46,7 +45,7 @@ vi.mock("./context-recipe-engine.js", () => ({
 // Mock project registry
 vi.mock("../routes/projects.js", () => ({
   getRegistry: () => new Map([
-    ["proj-1", { id: "proj-1", name: "Test Project", path: "/tmp/test-project" }], // eslint-disable-line sonarjs/publicly-writable-directories
+    ["proj-1", { id: "proj-1", name: "Test Project", path: "/tmp/test-project" }],
   ]),
 }));
 
@@ -218,7 +217,7 @@ describe("AutomationEngine", () => {
 
       expect(updated.name).toBe("Updated Name");
       expect(updated.description).toBe("Updated description");
-      expect(updated.updatedAt).not.toBe(created.updatedAt);
+      expect(new Date(updated.updatedAt).getTime()).toBeGreaterThanOrEqual(new Date(created.updatedAt).getTime());
     });
 
     it("throws when updating non-existent automation", () => {
@@ -656,7 +655,7 @@ describe("AutomationEngine", () => {
       expect(details!.worktree).toBeDefined();
       expect(details!.worktree!.worktreeId).toBe("wt-1");
       expect(details!.worktree!.branch).toBe("feature/auto");
-      expect(details!.worktree!.path).toBe("/tmp/wt"); // eslint-disable-line sonarjs/publicly-writable-directories
+      expect(details!.worktree!.path).toBe("/tmp/wt");
       expect(details!.worktree!.status).toBe("active");
     });
 

@@ -94,6 +94,10 @@ describe("AutomationsPage", () => {
       runs: [],
       activeRun: null,
       runLoading: false,
+      // Prevent mount useEffect from calling real store actions
+      fetchAutomations: vi.fn().mockResolvedValue(undefined),
+      fetchExtensionJobs: vi.fn().mockResolvedValue(undefined),
+      fetchModels: vi.fn().mockResolvedValue(undefined),
     });
   });
 

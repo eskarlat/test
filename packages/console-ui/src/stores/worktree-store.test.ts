@@ -21,7 +21,7 @@ function makeWorktree(overrides: Partial<Worktree> = {}): Worktree {
     id: "wt-1",
     projectId: "proj-1",
     branch: "feature/test",
-    path: "/tmp/worktrees/wt-1", // eslint-disable-line sonarjs/publicly-writable-directories
+    path: "/tmp/worktrees/wt-1",
     status: "ready",
     cleanupPolicy: "always",
     createdBy: { type: "user" },
