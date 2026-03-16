@@ -18,10 +18,10 @@ export function createTestApp(...routers: express.Router[]): express.Application
  */
 export async function request(
   app: express.Application,
-  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
+  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "OPTIONS",
   url: string,
   body?: unknown,
-): Promise<{ status: number; body: unknown }> {
+): Promise<{ status: number; body: unknown; headers: Record<string, string> }> {
   return new Promise((resolve, reject) => {
     const server = createServer(app);
     server.listen(0, () => {
@@ -48,8 +48,12 @@ export async function request(
           } catch {
             responseBody = text || undefined;
           }
+          const headers: Record<string, string> = {};
+          res.headers.forEach((val, key) => {
+            headers[key] = val;
+          });
           server.close();
-          resolve({ status: res.status, body: responseBody });
+          resolve({ status: res.status, body: responseBody, headers });
         })
         .catch((err) => {
           server.close();

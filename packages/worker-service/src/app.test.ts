@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import express, { Router } from "express";
-import { createServer } from "node:http";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -108,56 +107,7 @@ vi.mock("node:fs", async (importOriginal) => {
 
 import { createApp } from "./app.js";
 
-// ---------------------------------------------------------------------------
-// Request helper (same pattern as automations.test.ts)
-// ---------------------------------------------------------------------------
-
-async function request(
-  app: express.Application,
-  method: "GET" | "POST" | "PUT" | "DELETE" | "OPTIONS",
-  url: string,
-  body?: unknown,
-): Promise<{ status: number; body: unknown; headers: Record<string, string> }> {
-  return new Promise((resolve, reject) => {
-    const server = createServer(app);
-    server.listen(0, () => {
-      const addr = server.address();
-      if (!addr || typeof addr === "string") {
-        server.close();
-        reject(new Error("Failed to start server"));
-        return;
-      }
-      const port = addr.port;
-      const options: RequestInit = {
-        method,
-        headers: { "Content-Type": "application/json" },
-      };
-      if (body !== undefined) {
-        options.body = JSON.stringify(body);
-      }
-      fetch(`http://localhost:${port}${url}`, options)
-        .then(async (res) => {
-          let responseBody: unknown;
-          const text = await res.text();
-          try {
-            responseBody = JSON.parse(text);
-          } catch {
-            responseBody = text || undefined;
-          }
-          const headers: Record<string, string> = {};
-          res.headers.forEach((val, key) => {
-            headers[key] = val;
-          });
-          server.close();
-          resolve({ status: res.status, body: responseBody, headers });
-        })
-        .catch((err) => {
-          server.close();
-          reject(err);
-        });
-    });
-  });
-}
+import { request } from "./test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Tests

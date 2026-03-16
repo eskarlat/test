@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import express from "express";
-import { createServer } from "node:http";
 
 const mocks = vi.hoisted(() => ({
   getClient: vi.fn().mockReturnValue(null),
@@ -21,6 +20,7 @@ vi.mock("../routes/projects.js", () => ({
 }));
 
 import { mcpBridgeMiddleware } from "./mcp-bridge-routes.js";
+import { request } from "../test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -35,49 +35,6 @@ function createApp(): express.Application {
     res.status(418).json({ passedThrough: true });
   });
   return app;
-}
-
-async function request(
-  app: express.Application,
-  method: "GET" | "POST",
-  url: string,
-  body?: unknown,
-): Promise<{ status: number; body: unknown }> {
-  return new Promise((resolve, reject) => {
-    const server = createServer(app);
-    server.listen(0, () => {
-      const addr = server.address();
-      if (!addr || typeof addr === "string") {
-        server.close();
-        reject(new Error("Failed to start server"));
-        return;
-      }
-      const port = addr.port;
-      const options: RequestInit = {
-        method,
-        headers: { "Content-Type": "application/json" },
-      };
-      if (body !== undefined) {
-        options.body = JSON.stringify(body);
-      }
-      fetch(`http://localhost:${port}${url}`, options)
-        .then(async (res) => {
-          const text = await res.text();
-          let responseBody: unknown;
-          try {
-            responseBody = JSON.parse(text);
-          } catch {
-            responseBody = text || undefined;
-          }
-          server.close();
-          resolve({ status: res.status, body: responseBody });
-        })
-        .catch((err) => {
-          server.close();
-          reject(err);
-        });
-    });
-  });
 }
 
 // ---------------------------------------------------------------------------

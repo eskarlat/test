@@ -87,6 +87,26 @@ describe("backup command", () => {
     return program.parseAsync(["node", "test", "backup", ...args]);
   }
 
+  const serverState = {
+    pid: 1234,
+    port: 42888,
+    startedAt: "2026-01-01T00:00:00Z",
+    activeProjects: [] as string[],
+  };
+
+  const healthResponse = {
+    status: "ok" as const,
+    uptime: 100,
+    memoryUsage: { heapUsed: 0, heapTotal: 0, rss: 0, external: 0, arrayBuffers: 0 },
+    port: 42888,
+    version: "0.1.0",
+  };
+
+  function mockServerRunning() {
+    mockReadServerState.mockReturnValue(serverState);
+    mockCheckHealth.mockResolvedValue(healthResponse);
+  }
+
   describe("backup (create)", () => {
     it("exits if server is not running", async () => {
       mockReadServerState.mockReturnValue(null);
@@ -95,31 +115,14 @@ describe("backup command", () => {
     });
 
     it("exits if server is not responding to health check", async () => {
-      mockReadServerState.mockReturnValue({
-        pid: 1234,
-        port: 42888,
-        startedAt: "2026-01-01T00:00:00Z",
-        activeProjects: [],
-      });
+      mockReadServerState.mockReturnValue(serverState);
       mockCheckHealth.mockResolvedValue(null);
 
       await expect(runBackup()).rejects.toThrow("process.exit called");
     });
 
     it("creates backup successfully", async () => {
-      mockReadServerState.mockReturnValue({
-        pid: 1234,
-        port: 42888,
-        startedAt: "2026-01-01T00:00:00Z",
-        activeProjects: [],
-      });
-      mockCheckHealth.mockResolvedValue({
-        status: "ok",
-        uptime: 100,
-        memoryUsage: { heapUsed: 0, heapTotal: 0, rss: 0, external: 0, arrayBuffers: 0 },
-        port: 42888,
-        version: "0.1.0",
-      });
+      mockServerRunning();
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ ok: true, path: "/backups/data-123.db" }),
@@ -134,19 +137,7 @@ describe("backup command", () => {
     });
 
     it("exits on backup API error", async () => {
-      mockReadServerState.mockReturnValue({
-        pid: 1234,
-        port: 42888,
-        startedAt: "2026-01-01T00:00:00Z",
-        activeProjects: [],
-      });
-      mockCheckHealth.mockResolvedValue({
-        status: "ok",
-        uptime: 100,
-        memoryUsage: { heapUsed: 0, heapTotal: 0, rss: 0, external: 0, arrayBuffers: 0 },
-        port: 42888,
-        version: "0.1.0",
-      });
+      mockServerRunning();
       mockFetch.mockResolvedValueOnce({
         ok: false,
         text: () => Promise.resolve("Internal error"),
@@ -156,19 +147,7 @@ describe("backup command", () => {
     });
 
     it("exits on fetch exception", async () => {
-      mockReadServerState.mockReturnValue({
-        pid: 1234,
-        port: 42888,
-        startedAt: "2026-01-01T00:00:00Z",
-        activeProjects: [],
-      });
-      mockCheckHealth.mockResolvedValue({
-        status: "ok",
-        uptime: 100,
-        memoryUsage: { heapUsed: 0, heapTotal: 0, rss: 0, external: 0, arrayBuffers: 0 },
-        port: 42888,
-        version: "0.1.0",
-      });
+      mockServerRunning();
       mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
       await expect(runBackup()).rejects.toThrow("process.exit called");
@@ -214,19 +193,7 @@ describe("backup command", () => {
       vol.mkdirSync("/home/user/.renre-kit/backups", { recursive: true });
       vol.writeFileSync("/home/user/.renre-kit/backups/data-001.db", "backup-data");
 
-      mockReadServerState.mockReturnValue({
-        pid: 1234,
-        port: 42888,
-        startedAt: "2026-01-01T00:00:00Z",
-        activeProjects: [],
-      });
-      mockCheckHealth.mockResolvedValue({
-        status: "ok",
-        uptime: 100,
-        memoryUsage: { heapUsed: 0, heapTotal: 0, rss: 0, external: 0, arrayBuffers: 0 },
-        port: 42888,
-        version: "0.1.0",
-      });
+      mockServerRunning();
 
       await expect(runBackup("restore", "data-001.db")).rejects.toThrow(
         "process.exit called",

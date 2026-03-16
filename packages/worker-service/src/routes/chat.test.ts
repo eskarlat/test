@@ -46,8 +46,8 @@ vi.mock("../core/copilot-bridge.js", () => ({
 }));
 
 import express from "express";
-import { createServer } from "node:http";
 import { chatRouter, projectChatRouter } from "./chat.js";
+import { request } from "../test-helpers.js";
 import { copilotBridge } from "../core/copilot-bridge.js";
 
 // Cast for easy access to mock fns
@@ -61,48 +61,6 @@ function createApp(): express.Application {
   return app;
 }
 
-async function request(
-  app: express.Application,
-  method: "GET" | "POST" | "PUT" | "DELETE",
-  url: string,
-  body?: unknown,
-): Promise<{ status: number; body: unknown }> {
-  return new Promise((resolve, reject) => {
-    const server = createServer(app);
-    server.listen(0, () => {
-      const addr = server.address();
-      if (!addr || typeof addr === "string") {
-        server.close();
-        reject(new Error("Failed to start server"));
-        return;
-      }
-      const port = addr.port;
-      const options: RequestInit = {
-        method,
-        headers: { "Content-Type": "application/json" },
-      };
-      if (body !== undefined) {
-        options.body = JSON.stringify(body);
-      }
-      fetch(`http://localhost:${port}${url}`, options)
-        .then(async (res) => {
-          let responseBody: unknown;
-          const text = await res.text();
-          try {
-            responseBody = JSON.parse(text);
-          } catch {
-            responseBody = text || undefined;
-          }
-          server.close();
-          resolve({ status: res.status, body: responseBody });
-        })
-        .catch((err) => {
-          server.close();
-          reject(err);
-        });
-    });
-  });
-}
 
 describe("chat routes", () => {
   let app: express.Application;
