@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { ChatMessage } from "../types/chat";
 
 // Mock the API client
 vi.mock("../api/client", () => ({
@@ -214,12 +215,12 @@ describe("chat-store", () => {
 
   describe("deleteSession", () => {
     it("removes session and its messages", async () => {
-      const messages = new Map<string, Array<{ id: string; role: string; blocks: Array<{ type: string; content: string }>; timestamp: string; isStreaming: boolean }>>();
+      const messages = new Map<string, ChatMessage[]>();
       messages.set("sess-1", [
-        { id: "msg-1", role: "user", blocks: [{ type: "text", content: "hello" }], timestamp: "2026-01-01T00:00:00Z", isStreaming: false },
+        { id: "msg-1", role: "user", blocks: [{ type: "text", content: "hello" }], timestamp: "2026-01-01T00:00:00Z", isStreaming: false } as ChatMessage,
       ]);
       messages.set("sess-2", [
-        { id: "msg-2", role: "user", blocks: [{ type: "text", content: "world" }], timestamp: "2026-01-01T00:00:00Z", isStreaming: false },
+        { id: "msg-2", role: "user", blocks: [{ type: "text", content: "world" }], timestamp: "2026-01-01T00:00:00Z", isStreaming: false } as ChatMessage,
       ]);
       useChatStore.setState({
         sessions: [

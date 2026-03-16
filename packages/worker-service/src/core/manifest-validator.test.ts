@@ -56,7 +56,7 @@ describe("validateManifest", () => {
     });
 
     it("reports a single missing field", () => {
-      const { author: _, ...noAuthor } = validManifest;
+      const { author: __author, ...noAuthor } = validManifest;
       const result = validateManifest(noAuthor);
       expect(result.valid).toBe(false);
       expect(result.errors).toContain("Missing required field: author");

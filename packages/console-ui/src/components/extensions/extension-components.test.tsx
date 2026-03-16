@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 
@@ -47,7 +48,7 @@ describe("ExtensionErrorBoundary", () => {
   });
 
   it("renders fallback when child throws", () => {
-    function Bomb(): JSX.Element {
+    function Bomb(): ReactNode {
       throw new Error("Boom!");
     }
 

@@ -266,7 +266,9 @@ describe("StepDetail", () => {
   });
 
   it("shows dash for undefined duration", () => {
-    render(<StepDetail step={makeStep({ durationMs: undefined })} index={0} />);
+    const stepNoDuration = makeStep();
+    delete stepNoDuration.durationMs;
+    render(<StepDetail step={stepNoDuration} index={0} />);
     expect(screen.getByText("-")).toBeInTheDocument();
   });
 
@@ -306,7 +308,9 @@ describe("StepDetail", () => {
   });
 
   it("shows 'no response' when response is missing", () => {
-    render(<StepDetail step={makeStep({ response: undefined })} index={0} defaultExpanded />);
+    const stepNoResponse = makeStep();
+    delete stepNoResponse.response;
+    render(<StepDetail step={stepNoResponse} index={0} defaultExpanded />);
     fireEvent.click(screen.getByText("Response"));
     expect(screen.getByText("No response available.")).toBeInTheDocument();
   });

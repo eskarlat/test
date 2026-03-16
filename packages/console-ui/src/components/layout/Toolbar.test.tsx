@@ -61,7 +61,7 @@ describe("Toolbar", () => {
   function renderToolbar(onMenuToggle?: () => void) {
     return render(
       <MemoryRouter>
-        <Toolbar onMenuToggle={onMenuToggle} />
+        <Toolbar {...(onMenuToggle ? { onMenuToggle } : {})} />
       </MemoryRouter>,
     );
   }

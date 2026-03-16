@@ -10,12 +10,15 @@ export default tseslint.config(
   {
     rules: {
       // TypeScript
-      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", destructuredArrayIgnorePattern: "^_", ignoreRestSiblings: true }],
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/explicit-module-boundary-types": "off",
 
       // Cyclomatic complexity — max 10 branches per function
       "complexity": ["warn", { max: 10 }],
+
+      // Disable sonarjs no-unused-vars in favor of @typescript-eslint/no-unused-vars
+      "sonarjs/no-unused-vars": "off",
 
       // Cognitive complexity — max 15 (sonarjs)
       "sonarjs/cognitive-complexity": ["warn", 15],

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import express from "express";
-import { createTestApp, request } from "../test-helpers.js";
+import { request } from "../test-helpers.js";
 
 // Mock extension-registry
 const mockGetMountedInfo = vi.fn().mockReturnValue(null);

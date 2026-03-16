@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -332,7 +333,7 @@ describe("GlobalErrorBoundary", () => {
   });
 
   it("shows fallback when child throws", () => {
-    function Boom() {
+    function Boom(): ReactNode {
       throw new Error("Unexpected error!");
     }
     render(
@@ -346,7 +347,7 @@ describe("GlobalErrorBoundary", () => {
   });
 
   it("shows stack trace in details element", () => {
-    function Boom() {
+    function Boom(): ReactNode {
       throw new Error("Stack trace test");
     }
     render(
@@ -397,7 +398,7 @@ describe("ExtensionErrorBoundary", () => {
   });
 
   it("shows fallback when child throws", () => {
-    function Boom() {
+    function Boom(): ReactNode {
       throw new Error("Kaboom!");
     }
     render(

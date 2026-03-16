@@ -48,8 +48,8 @@ function renderWithRouter(initialEntry = "/proj-1") {
 describe("ProjectHomePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useProjectStore.setState({ projects: [{ id: "proj-1", name: "Test Project", path: "/tmp" }] });
-    useExtensionStore.setState({ extensions: {}, loading: false, error: null });
+    useProjectStore.setState({ projects: [{ id: "proj-1", name: "Test Project", path: "/tmp", extensionCount: 0, mountedExtensions: [] }] });
+    useExtensionStore.setState({ extensions: {} });
 
     mockApiGet.mockImplementation((url: string) => {
       if (url.includes("/projects/proj-1")) {

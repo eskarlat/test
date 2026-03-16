@@ -28,8 +28,8 @@ const { default: VaultPage } = await import("./vault");
 describe("VaultPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useVaultStore.setState({ keys: [], loading: false, error: null });
-    useNotificationStore.setState({ toasts: [], events: [] });
+    useVaultStore.setState({ keys: [] });
+    useNotificationStore.setState({ toasts: [], recentEvents: [] });
   });
 
   it("renders vault heading", async () => {

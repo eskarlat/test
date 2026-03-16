@@ -129,7 +129,7 @@ describe("ToolGovernancePage", () => {
       ],
     });
     renderWithRouter();
-    const names = screen.getAllByText(/priority/);
+    const _names = screen.getAllByText(/priority/);
     // Both rules should render
     expect(screen.getByText("High priority")).toBeTruthy();
     expect(screen.getByText("Low priority")).toBeTruthy();
@@ -356,7 +356,7 @@ describe("ToolGovernancePage", () => {
 
   it("shows audit entry with no ruleId as dash", () => {
     useToolRulesStore.setState({
-      auditLog: [makeAudit({ ruleId: undefined })],
+      auditLog: [(() => { const { ruleId: _ruleId, ...rest } = makeAudit(); return rest; })()],
     });
     renderWithRouter();
     fireEvent.click(screen.getByText("Audit Log"));
@@ -393,7 +393,7 @@ describe("ToolGovernancePage", () => {
     renderWithRouter();
     fireEvent.click(screen.getByText("Add Rule"));
     // Default is "ask", switch to "allow"
-    const allowRadios = screen.getAllByRole("radio");
+    const _allowRadios = screen.getAllByRole("radio");
     // There are pattern type radios + decision radios + scope radios
     // Just click on the "allow" text's radio
     fireEvent.click(screen.getByLabelText("allow"));

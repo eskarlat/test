@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useNotificationStore } from "./notification-store";
-import type { Toast, UpdateInfo, EventEntry } from "./notification-store";
+import type { UpdateInfo, EventEntry } from "./notification-store";
 
 describe("notification-store", () => {
   beforeEach(() => {

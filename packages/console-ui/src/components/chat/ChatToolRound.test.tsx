@@ -24,9 +24,8 @@ function toolBlock(name: string, roundId: string, status = "complete"): ToolExec
     toolName: name,
     roundId,
     status,
-    input: {},
-    output: "",
-    isDone: true,
+    arguments: {},
+    isHistorical: false,
   } as ToolExecutionBlock;
 }
 

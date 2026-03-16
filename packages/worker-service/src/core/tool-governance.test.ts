@@ -204,7 +204,7 @@ describe("tool-governance", () => {
     });
 
     it("returns rules ordered by priority DESC", () => {
-      const r1 = addRule(null, "low-priority", "deny", null, null, "global");
+      const _r1 = addRule(null, "low-priority", "deny", null, null, "global");
       const r2 = addRule(null, "high-priority", "deny", null, null, "global");
       updateRule(r2.id, { priority: 50 });
 
@@ -298,7 +298,7 @@ describe("tool-governance", () => {
     });
 
     it("higher priority rules take precedence", () => {
-      const r1 = addRule(null, "test-cmd", "allow", null, "Allow", "global");
+      const _r1 = addRule(null, "test-cmd", "allow", null, "Allow", "global");
       const r2 = addRule(null, "test-cmd", "deny", null, "Deny", "global");
       updateRule(r2.id, { priority: 50 });
 

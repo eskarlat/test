@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import express from "express";
-import { createTestApp, request } from "../test-helpers.js";
+import { request } from "../test-helpers.js";
 import { extensionTimeout } from "./extension-timeout.js";
 
 describe("extension-timeout", () => {

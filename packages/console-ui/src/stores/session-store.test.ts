@@ -23,7 +23,7 @@ vi.mock("../api/socket", () => ({
 
 import { apiGet } from "../api/client";
 import { useSessionStore } from "./session-store";
-import type { Session, TimelineEvent, SessionFilter } from "./session-store";
+import type { Session, SessionFilter } from "./session-store";
 
 const mockApiGet = vi.mocked(apiGet);
 

@@ -514,7 +514,7 @@ export default function ChatPage() {
   const { projectId, sessionId } = useParams<{ projectId: string; sessionId?: string }>();
   const navigate = useNavigate();
   const bridgeStatus = useChatStore(selectBridgeStatus);
-  const sessions = useChatStore(selectSessions);
+  const _sessions = useChatStore(selectSessions);
   const sessionsFetched = useChatStore(selectSessionsFetched);
   const sessionError = useChatStore(selectSessionError);
   const pendingPermission = useChatStore(selectPendingPermission);

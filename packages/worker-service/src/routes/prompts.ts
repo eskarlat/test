@@ -40,7 +40,7 @@ router.get("/api/:projectId/prompts/stats", (req: Request, res: Response) => {
   const { projectId } = req.params;
   const base = analytics(projectId!);
 
-  let byAgent: Record<string, number> = {};
+  const byAgent: Record<string, number> = {};
   try {
     const rows = dbManager
       .getConnection()

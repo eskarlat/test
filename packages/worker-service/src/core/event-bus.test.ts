@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { eventBus, type WorkerEvent, type WorkerEventType } from "./event-bus.js";
+import { eventBus, type WorkerEvent } from "./event-bus.js";
 
 describe("EventBus", () => {
   beforeEach(() => {

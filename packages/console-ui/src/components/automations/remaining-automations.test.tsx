@@ -153,7 +153,9 @@ describe("StepDetail", () => {
 
   it("shows 'No response available' when response is empty", async () => {
     const user = userEvent.setup();
-    render(<StepDetail step={makeStep({ response: undefined })} index={0} defaultExpanded />);
+    const stepNoResponse = makeStep();
+    delete stepNoResponse.response;
+    render(<StepDetail step={stepNoResponse} index={0} defaultExpanded />);
     await user.click(screen.getByText("Response"));
     expect(screen.getByText("No response available.")).toBeTruthy();
   });
@@ -261,7 +263,7 @@ describe("AutomationCard", () => {
   it("renders 'Manual trigger only' for manual schedule", () => {
     render(
       <MemoryRouter>
-        <AutomationCard automation={makeAutomation({ scheduleType: "manual", scheduleCron: undefined })} projectId="proj-1" />
+        <AutomationCard automation={(() => { const a = makeAutomation({ scheduleType: "manual" }); delete a.scheduleCron; return a; })()} projectId="proj-1" />
       </MemoryRouter>,
     );
     expect(screen.getByText("Manual trigger only")).toBeTruthy();
@@ -297,7 +299,7 @@ describe("AutomationCard", () => {
   it("shows 'Never run' when no lastRun", () => {
     render(
       <MemoryRouter>
-        <AutomationCard automation={makeAutomation({ lastRun: undefined })} projectId="proj-1" />
+        <AutomationCard automation={makeAutomation()} projectId="proj-1" />
       </MemoryRouter>,
     );
     expect(screen.getByText("Never run")).toBeTruthy();
