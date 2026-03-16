@@ -5,7 +5,7 @@
  */
 
 import { useCallback } from "react";
-import type { LayoutNode, PaneState, SplitDirection } from "../../stores/chat-layout-store";
+import type { LayoutNode, PaneState } from "../../stores/chat-layout-store";
 import { SplitContainer } from "./SplitContainer";
 import { ChatPane } from "./ChatPane";
 

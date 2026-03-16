@@ -3,7 +3,7 @@
  * ADR-052 §2.2
  */
 
-import { X, MessageSquare, Circle } from "lucide-react";
+import { X, Circle } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useChatStore, type ChatState } from "../../stores/chat-store";
 import type { SessionMetadata } from "../../types/chat";

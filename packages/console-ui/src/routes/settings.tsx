@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { Settings, AlertCircle, RefreshCw } from "lucide-react";
 import { Skeleton } from "../components/ui/Skeleton";
 import { apiGet, BASE_URL } from "../api/client";
-import { useChatPreferencesStore, type ToolDisplayMode } from "../stores/chat-preferences-store";
 import { ToolDisplayModeSelector } from "../components/chat/ToolDisplayModeSelector";
 
 interface HealthData {

@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useRef, useCallback } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams } from "react-router";
 import { useSocketStore } from "../../api/socket";
 import {
   useChatStore,
@@ -18,7 +18,16 @@ import {
   onVisibilityChange,
   createDefaultSessionState,
 } from "../../stores/chat-store";
-import { uuid } from "../../lib/utils";
+import {
+  createStreamingAssistantMessage,
+  createCompactionStartMessage,
+  createErrorMessage,
+  buildCompactionCompleteUpdate,
+  buildToolStartUpdate,
+  buildToolCompleteUpdate,
+  buildSubagentStartUpdate,
+  buildSubagentCompleteUpdate,
+} from "../../lib/chat-socket-handlers";
 import { ChatMessageList } from "./ChatMessageList";
 import { ChatInput } from "./ChatInput";
 import { ChatContextBar } from "./ChatContextBar";
@@ -27,13 +36,90 @@ import { ChatInputDialog } from "./ChatInputDialog";
 import { ChatElicitationDialog } from "./ChatElicitationDialog";
 import { ChatPaneHeader } from "./ChatPaneHeader";
 import { ChatSessionPickerDialog } from "./ChatSessionPickerDialog";
-import type { ChatMessage, ContentBlock } from "../../types/chat";
 
 // ---------------------------------------------------------------------------
 // Deduplication tracker for pending initial messages
 // ---------------------------------------------------------------------------
 
 const sentPendingPanes = new Set<string>();
+
+// ---------------------------------------------------------------------------
+// Per-session tool/subagent state updaters
+// These wrap the shared buildXxx helpers with per-session state tracking.
+// ---------------------------------------------------------------------------
+
+function paneToolStartUpdate(
+  sessionId: string,
+  data: { toolCallId: string; roundId: string; toolName: string; toolArgs?: Record<string, unknown> },
+): (s: ChatState) => Partial<ChatState> {
+  const baseUpdate = buildToolStartUpdate(sessionId, data);
+  return (s) => {
+    const base = baseUpdate(s);
+    // Sync to per-session state
+    const ss = s.sessionStates.get(sessionId) ?? createDefaultSessionState();
+    const tools = new Map(ss.activeTools);
+    tools.set(data.toolCallId, { ...data, status: "running", startedAt: Date.now() });
+    const newStates = new Map(s.sessionStates);
+    newStates.set(sessionId, { ...ss, activeTools: tools });
+    const topLevel: Partial<ChatState> = { ...base, sessionStates: newStates };
+    if (s.activeSessionId === sessionId) topLevel.activeTools = tools;
+    return topLevel;
+  };
+}
+
+function paneToolCompleteUpdate(
+  sessionId: string,
+  data: { toolCallId: string; toolName?: string; result?: Record<string, unknown>; success?: boolean; error?: unknown },
+): (s: ChatState) => Partial<ChatState> {
+  const baseUpdate = buildToolCompleteUpdate(sessionId, data);
+  return (s) => {
+    const base = baseUpdate(s);
+    const ss = s.sessionStates.get(sessionId) ?? createDefaultSessionState();
+    const tools = new Map(ss.activeTools);
+    tools.delete(data.toolCallId);
+    const newStates = new Map(s.sessionStates);
+    newStates.set(sessionId, { ...ss, activeTools: tools });
+    const topLevel: Partial<ChatState> = { ...base, sessionStates: newStates };
+    if (s.activeSessionId === sessionId) topLevel.activeTools = tools;
+    return topLevel;
+  };
+}
+
+function paneSubagentStartUpdate(
+  sessionId: string,
+  data: { toolCallId: string; agentName: string; agentDisplayName?: string },
+): (s: ChatState) => Partial<ChatState> {
+  const baseUpdate = buildSubagentStartUpdate(sessionId, data);
+  return (s) => {
+    const base = baseUpdate(s);
+    const ss = s.sessionStates.get(sessionId) ?? createDefaultSessionState();
+    const subs = new Map(ss.activeSubagents);
+    subs.set(data.toolCallId, { ...data, status: "running", startedAt: Date.now() });
+    const newStates = new Map(s.sessionStates);
+    newStates.set(sessionId, { ...ss, activeSubagents: subs });
+    const topLevel: Partial<ChatState> = { ...base, sessionStates: newStates };
+    if (s.activeSessionId === sessionId) topLevel.activeSubagents = subs;
+    return topLevel;
+  };
+}
+
+function paneSubagentCompleteUpdate(
+  sessionId: string,
+  data: { toolCallId: string },
+): (s: ChatState) => Partial<ChatState> {
+  const baseUpdate = buildSubagentCompleteUpdate(sessionId, data);
+  return (s) => {
+    const base = baseUpdate(s);
+    const ss = s.sessionStates.get(sessionId) ?? createDefaultSessionState();
+    const subs = new Map(ss.activeSubagents);
+    subs.delete(data.toolCallId);
+    const newStates = new Map(s.sessionStates);
+    newStates.set(sessionId, { ...ss, activeSubagents: subs });
+    const topLevel: Partial<ChatState> = { ...base, sessionStates: newStates };
+    if (s.activeSessionId === sessionId) topLevel.activeSubagents = subs;
+    return topLevel;
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Socket binding for a specific pane+session pair
@@ -55,14 +141,7 @@ function usePaneSocket(paneId: string, sessionId: string | null): void {
         useChatStore.getState().finalizeAssistantMessage(sessionId!);
       }
       onSessionTurnStart(sessionId!);
-      const msg: ChatMessage = {
-        id: uuid(),
-        role: "assistant",
-        blocks: [],
-        timestamp: new Date().toISOString(),
-        isStreaming: true,
-      };
-      useChatStore.getState().appendMessage(sessionId!, msg);
+      useChatStore.getState().appendMessage(sessionId!, createStreamingAssistantMessage());
     }
 
     function ensureStreamingState(): void {
@@ -72,13 +151,7 @@ function usePaneSocket(paneId: string, sessionId: string | null): void {
         const msgs = useChatStore.getState().messages.get(sessionId!);
         const last = msgs?.[msgs.length - 1];
         if (!last || last.role !== "assistant" || !last.isStreaming) {
-          useChatStore.getState().appendMessage(sessionId!, {
-            id: uuid(),
-            role: "assistant",
-            blocks: [],
-            timestamp: new Date().toISOString(),
-            isStreaming: true,
-          });
+          useChatStore.getState().appendMessage(sessionId!, createStreamingAssistantMessage());
         }
       }
     }
@@ -115,14 +188,7 @@ function usePaneSocket(paneId: string, sessionId: string | null): void {
 
     function handleError(data: { message: string }): void {
       useChatStore.setState({ sessionError: data.message });
-      const block: ContentBlock = { type: "warning", message: data.message };
-      useChatStore.getState().appendMessage(sessionId!, {
-        id: uuid(),
-        role: "system",
-        blocks: [block],
-        timestamp: new Date().toISOString(),
-        isStreaming: false,
-      });
+      useChatStore.getState().appendMessage(sessionId!, createErrorMessage(data.message));
       useChatStore.getState().clearSessionStreamingState(sessionId!);
     }
 
@@ -137,173 +203,27 @@ function usePaneSocket(paneId: string, sessionId: string | null): void {
     }
 
     function handleCompactionStart(): void {
-      const block: ContentBlock = { type: "compaction", tokensRemoved: 0, summary: "Compacting..." };
-      useChatStore.getState().appendMessage(sessionId!, {
-        id: `compaction-${Date.now()}`,
-        role: "system",
-        blocks: [block],
-        timestamp: new Date().toISOString(),
-        isStreaming: false,
-      });
+      useChatStore.getState().appendMessage(sessionId!, createCompactionStartMessage());
     }
 
     function handleCompactionComplete(data: { tokensRemoved: number; summary?: string }): void {
-      const block: ContentBlock = {
-        type: "compaction",
-        tokensRemoved: data.tokensRemoved,
-        ...(data.summary ? { summary: data.summary } : {}),
-      };
-      useChatStore.setState((s) => {
-        const next = new Map(s.messages);
-        const msgs = next.get(sessionId!);
-        if (!msgs) return {};
-        const updated = msgs.map((m) =>
-          m.blocks.length === 1 && m.blocks[0]?.type === "compaction" && m.blocks[0].tokensRemoved === 0
-            ? { ...m, blocks: [block] }
-            : m,
-        );
-        next.set(sessionId!, updated);
-        return { messages: next };
-      });
+      useChatStore.setState(buildCompactionCompleteUpdate(sessionId!, data));
     }
 
     function handleToolStart(data: { toolCallId: string; roundId: string; toolName: string; toolArgs?: Record<string, unknown> }): void {
-      const block: ContentBlock = {
-        type: "tool-execution",
-        toolCallId: data.toolCallId,
-        roundId: data.roundId,
-        toolName: data.toolName,
-        arguments: data.toolArgs ?? {},
-        status: "running",
-        isHistorical: false,
-      };
-      useChatStore.setState((s) => {
-        const ss = s.sessionStates.get(sessionId!) ?? createDefaultSessionState();
-        const tools = new Map(ss.activeTools);
-        tools.set(data.toolCallId, { ...data, status: "running", startedAt: Date.now() });
-
-        const msgs = new Map(s.messages);
-        const list = msgs.get(sessionId!) ?? [];
-        const last = list[list.length - 1];
-        if (last?.role === "assistant") {
-          const updated = { ...last, blocks: [...last.blocks, block] };
-          msgs.set(sessionId!, [...list.slice(0, -1), updated]);
-        }
-        const newStates = new Map(s.sessionStates);
-        newStates.set(sessionId!, { ...ss, activeTools: tools });
-        const topLevel: Partial<ChatState> = { messages: msgs, sessionStates: newStates };
-        if (s.activeSessionId === sessionId) topLevel.activeTools = tools;
-        return topLevel;
-      });
+      useChatStore.setState(paneToolStartUpdate(sessionId!, data));
     }
 
     function handleToolComplete(data: { toolCallId: string; toolName?: string; result?: Record<string, unknown>; success?: boolean; error?: unknown }): void {
-      useChatStore.setState((s) => {
-        const ss = s.sessionStates.get(sessionId!) ?? createDefaultSessionState();
-        const tools = new Map(ss.activeTools);
-        const tracked = tools.get(data.toolCallId);
-        const duration = tracked ? Date.now() - tracked.startedAt : undefined;
-        tools.delete(data.toolCallId);
-
-        const msgs = new Map(s.messages);
-        const list = msgs.get(sessionId!) ?? [];
-        const updatedList = list.map((msg) => {
-          if (msg.role !== "assistant") return msg;
-          const blockIdx = msg.blocks.findIndex(
-            (b) => b.type === "tool-execution" && b.toolCallId === data.toolCallId,
-          );
-          if (blockIdx < 0) return msg;
-          const oldBlock = msg.blocks[blockIdx] as import("../../types/chat").ToolExecutionBlock;
-          const resultObj = data.result ?? {};
-          const resultContent = typeof resultObj === "object" && resultObj !== null && "content" in resultObj && typeof (resultObj as Record<string, unknown>).content === "string"
-            ? (resultObj as Record<string, unknown>).content as string
-            : JSON.stringify(resultObj, null, 2);
-          const errorStr = data.error
-            ? (typeof data.error === "object" ? JSON.stringify(data.error) : String(data.error))
-            : undefined;
-          const newBlock: ContentBlock = {
-            ...oldBlock,
-            status: data.success === false ? "error" : "complete",
-            result: { content: resultContent },
-            ...(errorStr ? { error: errorStr } : {}),
-            ...(duration != null ? { duration } : {}),
-          };
-          const blocks = [...msg.blocks];
-          blocks[blockIdx] = newBlock;
-          return { ...msg, blocks };
-        });
-        msgs.set(sessionId!, updatedList);
-
-        const newStates = new Map(s.sessionStates);
-        newStates.set(sessionId!, { ...ss, activeTools: tools });
-        const topLevel: Partial<ChatState> = { messages: msgs, sessionStates: newStates };
-        if (s.activeSessionId === sessionId) topLevel.activeTools = tools;
-        return topLevel;
-      });
+      useChatStore.setState(paneToolCompleteUpdate(sessionId!, data));
     }
 
     function handleSubagentStart(data: { toolCallId: string; agentName: string; agentDisplayName?: string }): void {
-      const block: ContentBlock = {
-        type: "subagent",
-        toolCallId: data.toolCallId,
-        agentName: data.agentName,
-        agentDisplayName: data.agentDisplayName ?? data.agentName,
-        status: "running",
-      };
-      useChatStore.setState((s) => {
-        const ss = s.sessionStates.get(sessionId!) ?? createDefaultSessionState();
-        const subs = new Map(ss.activeSubagents);
-        subs.set(data.toolCallId, { ...data, status: "running", startedAt: Date.now() });
-
-        const msgs = new Map(s.messages);
-        const list = msgs.get(sessionId!) ?? [];
-        const last = list[list.length - 1];
-        if (last?.role === "assistant") {
-          const updated = { ...last, blocks: [...last.blocks, block] };
-          msgs.set(sessionId!, [...list.slice(0, -1), updated]);
-        }
-        const newStates = new Map(s.sessionStates);
-        newStates.set(sessionId!, { ...ss, activeSubagents: subs });
-        const topLevel: Partial<ChatState> = { messages: msgs, sessionStates: newStates };
-        if (s.activeSessionId === sessionId) topLevel.activeSubagents = subs;
-        return topLevel;
-      });
+      useChatStore.setState(paneSubagentStartUpdate(sessionId!, data));
     }
 
     function handleSubagentComplete(data: { toolCallId: string }): void {
-      useChatStore.setState((s) => {
-        const ss = s.sessionStates.get(sessionId!) ?? createDefaultSessionState();
-        const subs = new Map(ss.activeSubagents);
-        const tracked = subs.get(data.toolCallId);
-        const duration = tracked ? Date.now() - tracked.startedAt : undefined;
-        subs.delete(data.toolCallId);
-
-        const msgs = new Map(s.messages);
-        const list = msgs.get(sessionId!) ?? [];
-        const updatedList = list.map((msg) => {
-          if (msg.role !== "assistant") return msg;
-          const blockIdx = msg.blocks.findIndex(
-            (b) => b.type === "subagent" && b.toolCallId === data.toolCallId,
-          );
-          if (blockIdx < 0) return msg;
-          const oldBlock = msg.blocks[blockIdx] as import("../../types/chat").SubagentBlock;
-          const newBlock: ContentBlock = {
-            ...oldBlock,
-            status: "complete",
-            ...(duration != null ? { duration } : {}),
-          };
-          const blocks = [...msg.blocks];
-          blocks[blockIdx] = newBlock;
-          return { ...msg, blocks };
-        });
-        msgs.set(sessionId!, updatedList);
-
-        const newStates = new Map(s.sessionStates);
-        newStates.set(sessionId!, { ...ss, activeSubagents: subs });
-        const topLevel: Partial<ChatState> = { messages: msgs, sessionStates: newStates };
-        if (s.activeSessionId === sessionId) topLevel.activeSubagents = subs;
-        return topLevel;
-      });
+      useChatStore.setState(paneSubagentCompleteUpdate(sessionId!, data));
     }
 
     function handlePermission(data: { requestId: string; title: string; message: string; permissionKind: string; diff?: string }): void {
@@ -312,7 +232,6 @@ function usePaneSocket(paneId: string, sessionId: string | null): void {
         return;
       }
       useChatStore.getState().updateSessionState(sessionId!, { pendingPermission: data });
-      // Also set top-level for backward compat
       if (useChatStore.getState().activeSessionId === sessionId) {
         useChatStore.setState({ pendingPermission: data });
       }
@@ -415,7 +334,6 @@ export function ChatPane({
   onSessionChange,
 }: ChatPaneProps) {
   const { projectId } = useParams<{ projectId: string }>();
-  const navigate = useNavigate();
   const bridgeStatus = useChatStore((s) => s.bridgeStatus);
   const createSession = useChatStore((s) => s.createSession);
 

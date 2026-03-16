@@ -101,8 +101,10 @@ function updateRatio(node: LayoutNode, path: number[], ratio: number): LayoutNod
   }
   if (node.type === "leaf" || path.length === 0) return node;
   const [idx, ...rest] = path;
+  if (idx === undefined || idx < 0 || idx > 1) return node;
   const children: [LayoutNode, LayoutNode] = [...node.children];
-  children[idx!] = updateRatio(children[idx!], rest, ratio);
+  const child = children[idx as 0 | 1];
+  children[idx as 0 | 1] = updateRatio(child, rest, ratio);
   return { ...node, children };
 }
 
@@ -160,7 +162,9 @@ export function createChatLayoutStore(projectId: string) {
           if (countLeaves(layout) <= 1) return; // Can't close last pane
           const newLayout = removeLeaf(layout, paneId);
           if (!newLayout) return;
-          const { [paneId]: _removed, ...rest } = panes;
+          const rest = Object.fromEntries(
+            Object.entries(panes).filter(([id]) => id !== paneId),
+          );
           const remainingIds = collectPaneIds(newLayout);
           const newFocused = remainingIds.includes(focusedPaneId)
             ? focusedPaneId

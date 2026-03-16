@@ -23,7 +23,6 @@ import type { ChatMessage, ContentBlock } from "../types/chat";
 // ---------------------------------------------------------------------------
 
 const selectBridgeStatus = (s: ChatState) => s.bridgeStatus;
-const selectSessions = (s: ChatState) => s.sessions;
 const selectSessionsFetched = (s: ChatState) => s.sessionsFetched;
 const selectSessionError = (s: ChatState) => s.sessionError;
 const selectPendingPermission = (s: ChatState) => s.pendingPermission;
@@ -579,7 +578,6 @@ export default function ChatPage() {
   const { projectId, sessionId } = useParams<{ projectId: string; sessionId?: string }>();
   const navigate = useNavigate();
   const bridgeStatus = useChatStore(selectBridgeStatus);
-  const sessions = useChatStore(selectSessions);
   const sessionsFetched = useChatStore(selectSessionsFetched);
   const sessionError = useChatStore(selectSessionError);
   const pendingPermission = useChatStore(selectPendingPermission);
@@ -719,46 +717,47 @@ export default function ChatPage() {
         </div>
 
         {/* Layout area */}
-        {bridgeStatus === "ready" ? (
-          isMultiPane ? (
-            <div className="flex-1 min-h-0">
-              <ChatLayoutRenderer
-                node={layout}
-                panes={panes}
-                focusedPaneId={focusedPaneId}
-                path={[]}
-                onSplitRatio={setSplitRatio}
-                onFocusPane={setFocusedPane}
-                onClosePane={closePane}
-                onSessionChange={handlePaneSessionChange}
-                canClose={paneCount > 1}
-              />
-            </div>
-          ) : sessionId ? (
-            <>
-              <ChatContextBar />
-              <ChatMessageList sessionId={sessionId} />
-              {pendingPermission && (
-                <div className="px-2 md:px-4 pb-2">
-                  <ChatPermissionBanner key={pendingPermission.requestId} request={pendingPermission} />
-                </div>
-              )}
-              {pendingInput && (
-                <div className="px-2 md:px-4 pb-2">
-                  <ChatInputDialog request={pendingInput} />
-                </div>
-              )}
-              {pendingElicitation && (
-                <div className="px-2 md:px-4 pb-2">
-                  <ChatElicitationDialog request={pendingElicitation} />
-                </div>
-              )}
-              <ChatInput />
-            </>
-          ) : (
-            <ChatEmptyState sessionError={sessionError ?? undefined} />
-          )
-        ) : (
+        {bridgeStatus !== "ready" && (
+          <ChatEmptyState sessionError={sessionError ?? undefined} />
+        )}
+        {bridgeStatus === "ready" && isMultiPane && (
+          <div className="flex-1 min-h-0">
+            <ChatLayoutRenderer
+              node={layout}
+              panes={panes}
+              focusedPaneId={focusedPaneId}
+              path={[]}
+              onSplitRatio={setSplitRatio}
+              onFocusPane={setFocusedPane}
+              onClosePane={closePane}
+              onSessionChange={handlePaneSessionChange}
+              canClose={paneCount > 1}
+            />
+          </div>
+        )}
+        {bridgeStatus === "ready" && !isMultiPane && sessionId && (
+          <>
+            <ChatContextBar />
+            <ChatMessageList sessionId={sessionId} />
+            {pendingPermission && (
+              <div className="px-2 md:px-4 pb-2">
+                <ChatPermissionBanner key={pendingPermission.requestId} request={pendingPermission} />
+              </div>
+            )}
+            {pendingInput && (
+              <div className="px-2 md:px-4 pb-2">
+                <ChatInputDialog request={pendingInput} />
+              </div>
+            )}
+            {pendingElicitation && (
+              <div className="px-2 md:px-4 pb-2">
+                <ChatElicitationDialog request={pendingElicitation} />
+              </div>
+            )}
+            <ChatInput />
+          </>
+        )}
+        {bridgeStatus === "ready" && !isMultiPane && !sessionId && (
           <ChatEmptyState sessionError={sessionError ?? undefined} />
         )}
       </div>
