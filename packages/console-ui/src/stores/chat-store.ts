@@ -22,6 +22,46 @@ import type {
 type BridgeStatus = "not-initialized" | "starting" | "ready" | "error" | "unavailable";
 
 // ---------------------------------------------------------------------------
+// Per-session streaming state (ADR-052 §2.5)
+// ---------------------------------------------------------------------------
+
+export interface SessionStreamState {
+  streamingContent: string;
+  streamingReasoning: string;
+  streamingReasoningTokens: number;
+  isStreaming: boolean;
+  isThinking: boolean;
+  ttftMs: number | null;
+  activeTools: Map<string, ToolExecution>;
+  activeSubagents: Map<string, SubagentExecution>;
+  pendingPermission: PermissionRequest | null;
+  pendingInput: InputRequest | null;
+  pendingElicitation: ElicitationRequest | null;
+  contextWindowPct: number;
+  isUserScrolledUp: boolean;
+  hasNewMessages: boolean;
+}
+
+function createDefaultSessionState(): SessionStreamState {
+  return {
+    streamingContent: "",
+    streamingReasoning: "",
+    streamingReasoningTokens: 0,
+    isStreaming: false,
+    isThinking: false,
+    ttftMs: null,
+    activeTools: new Map(),
+    activeSubagents: new Map(),
+    pendingPermission: null,
+    pendingInput: null,
+    pendingElicitation: null,
+    contextWindowPct: 0,
+    isUserScrolledUp: false,
+    hasNewMessages: false,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Store interface
 // ---------------------------------------------------------------------------
 
@@ -39,6 +79,11 @@ export interface ChatState {
 
   messages: Map<string, ChatMessage[]>;
 
+  // Per-session streaming state (ADR-052 §2.5)
+  sessionStates: Map<string, SessionStreamState>;
+
+  // Legacy top-level fields — delegates to active session's SessionStreamState
+  // for backward compat with components that haven't been refactored yet
   streamingContent: string;
   streamingReasoning: string;
   streamingReasoningTokens: number;
@@ -76,13 +121,16 @@ export interface ChatState {
   deleteSession(projectId: string, sessionId: string): Promise<void>;
   renameSession(sessionId: string, title: string): void;
   sendMessage(prompt: string, attachments?: Attachment[]): void;
+  sendMessageToSession(sessionId: string, prompt: string, attachments?: Attachment[]): void;
   cancelGeneration(): void;
+  cancelSessionGeneration(sessionId: string): void;
   setModel(modelId: string): void;
   setEffort(effort: "low" | "medium" | "high" | "xhigh"): void;
   setActiveSession(sessionId: string | null): void;
   scrollToBottom(): void;
   setUserScrolledUp(value: boolean): void;
   clearStreamingState(): void;
+  clearSessionStreamingState(sessionId: string): void;
   appendMessage(sessionId: string, message: ChatMessage): void;
   updateLastAssistantBlock(sessionId: string, block: ContentBlock): void;
   finalizeAssistantMessage(sessionId: string, fallbackContent?: string): void;
@@ -91,13 +139,82 @@ export interface ChatState {
   respondToPermission(requestId: string, approved: boolean): void;
   respondToInput(requestId: string, answer: string): void;
   respondToElicitation(requestId: string, data: Record<string, unknown>): void;
+  getSessionState(sessionId: string): SessionStreamState;
+  updateSessionState(sessionId: string, updates: Partial<SessionStreamState>): void;
   reset(): void;
 }
 
 // ---------------------------------------------------------------------------
-// RAF-based streaming buffer
+// RAF-based streaming buffer — per-session (ADR-052 §2.5)
 // ---------------------------------------------------------------------------
 
+interface StreamBuffer {
+  deltaBuffer: string;
+  reasoningBuffer: string;
+  rafId: number | null;
+  turnStartTime: number | null;
+}
+
+const sessionBuffers = new Map<string, StreamBuffer>();
+
+function getBuffer(sessionId: string): StreamBuffer {
+  let buf = sessionBuffers.get(sessionId);
+  if (!buf) {
+    buf = { deltaBuffer: "", reasoningBuffer: "", rafId: null, turnStartTime: null };
+    sessionBuffers.set(sessionId, buf);
+  }
+  return buf;
+}
+
+function flushSessionBuffers(
+  sessionId: string,
+  set: (fn: (s: ChatState) => Partial<ChatState>) => void,
+): void {
+  const buf = getBuffer(sessionId);
+  const pendingDelta = buf.deltaBuffer;
+  const pendingReasoning = buf.reasoningBuffer;
+  buf.deltaBuffer = "";
+  buf.reasoningBuffer = "";
+  buf.rafId = null;
+
+  set((s) => {
+    const ss = s.sessionStates.get(sessionId) ?? createDefaultSessionState();
+    const updates: Partial<SessionStreamState> = {};
+    if (pendingDelta) {
+      updates.streamingContent = ss.streamingContent + pendingDelta;
+      if (ss.ttftMs === null && buf.turnStartTime !== null) {
+        updates.ttftMs = performance.now() - buf.turnStartTime;
+      }
+    }
+    if (pendingReasoning) {
+      updates.streamingReasoning = ss.streamingReasoning + pendingReasoning;
+    }
+
+    const newStates = new Map(s.sessionStates);
+    newStates.set(sessionId, { ...ss, ...updates });
+
+    // Sync top-level fields if this is the active session
+    const topLevel: Partial<ChatState> = { sessionStates: newStates };
+    if (s.activeSessionId === sessionId) {
+      if (updates.streamingContent !== undefined) topLevel.streamingContent = updates.streamingContent;
+      if (updates.streamingReasoning !== undefined) topLevel.streamingReasoning = updates.streamingReasoning;
+      if (updates.ttftMs !== undefined) topLevel.ttftMs = updates.ttftMs;
+    }
+    return topLevel;
+  });
+}
+
+function scheduleSessionFlush(
+  sessionId: string,
+  set: (fn: (s: ChatState) => Partial<ChatState>) => void,
+): void {
+  const buf = getBuffer(sessionId);
+  if (!buf.rafId && !document.hidden) {
+    buf.rafId = requestAnimationFrame(() => flushSessionBuffers(sessionId, set));
+  }
+}
+
+// Legacy module-level buffers for backward compatibility
 let deltaBuffer = "";
 let reasoningBuffer = "";
 let rafId: number | null = null;
@@ -148,6 +265,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   selectedEffort: "medium",
 
   messages: new Map(),
+
+  sessionStates: new Map(),
 
   streamingContent: "",
   streamingReasoning: "",
@@ -238,17 +357,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     );
     if (res.data?.messages) {
       set((s) => {
-        // Don't overwrite messages during active streaming — the local state
-        // has the streaming assistant message that would be lost.
         if (s.isStreaming) {
           return { activeSessionId: sessionId };
         }
         const next = new Map(s.messages);
         const existing = next.get(sessionId);
         const serverMsgs = res.data!.messages;
-        // Don't overwrite local messages with empty server response.
-        // This prevents a race condition where sendMessage adds a local
-        // message before the resume response arrives with an empty array.
         if (serverMsgs.length > 0 || !existing || existing.length === 0) {
           next.set(sessionId, serverMsgs);
         }
@@ -263,10 +377,13 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       set((s) => {
         const messages = new Map(s.messages);
         messages.delete(sessionId);
+        const sessionStates = new Map(s.sessionStates);
+        sessionStates.delete(sessionId);
         return {
           sessions: s.sessions.filter((sess) => sess.id !== sessionId),
           activeSessionId: s.activeSessionId === sessionId ? null : s.activeSessionId,
           messages,
+          sessionStates,
         };
       });
     }
@@ -285,11 +402,14 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   // -------------------------------------------------------------------
 
   sendMessage: (prompt, attachments) => {
-    const socket = useSocketStore.getState().socket;
-    if (!socket) return;
-
     const sessionId = get().activeSessionId;
     if (!sessionId) return;
+    get().sendMessageToSession(sessionId, prompt, attachments);
+  },
+
+  sendMessageToSession: (sessionId, prompt, attachments) => {
+    const socket = useSocketStore.getState().socket;
+    if (!socket) return;
 
     const userMessage: ChatMessage = {
       id: uuid(),
@@ -307,13 +427,18 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       return { messages: next };
     });
 
-    socket.emit("chat:send", { prompt, attachments });
+    socket.emit("chat:send", { prompt, sessionId, attachments });
   },
 
   cancelGeneration: () => {
+    const sessionId = get().activeSessionId;
+    if (sessionId) get().cancelSessionGeneration(sessionId);
+  },
+
+  cancelSessionGeneration: (sessionId) => {
     const socket = useSocketStore.getState().socket;
     if (!socket) return;
-    socket.emit("chat:cancel", {});
+    socket.emit("chat:cancel", { sessionId });
   },
 
   // -------------------------------------------------------------------
@@ -322,7 +447,27 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
   setModel: (modelId) => set({ selectedModel: modelId }),
   setEffort: (effort) => set({ selectedEffort: effort }),
-  setActiveSession: (sessionId) => set({ activeSessionId: sessionId }),
+  setActiveSession: (sessionId) => {
+    // When switching active session, sync top-level fields from the new session's state
+    const ss = sessionId ? get().sessionStates.get(sessionId) ?? createDefaultSessionState() : createDefaultSessionState();
+    set({
+      activeSessionId: sessionId,
+      streamingContent: ss.streamingContent,
+      streamingReasoning: ss.streamingReasoning,
+      streamingReasoningTokens: ss.streamingReasoningTokens,
+      isStreaming: ss.isStreaming,
+      isThinking: ss.isThinking,
+      ttftMs: ss.ttftMs,
+      activeTools: ss.activeTools,
+      activeSubagents: ss.activeSubagents,
+      pendingPermission: ss.pendingPermission,
+      pendingInput: ss.pendingInput,
+      pendingElicitation: ss.pendingElicitation,
+      contextWindowPct: ss.contextWindowPct,
+      isUserScrolledUp: ss.isUserScrolledUp,
+      hasNewMessages: ss.hasNewMessages,
+    });
+  },
 
   scrollToBottom: () => set({ isUserScrolledUp: false, hasNewMessages: false }),
   setUserScrolledUp: (value) => set({ isUserScrolledUp: value }),
@@ -345,12 +490,53 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     });
   },
 
+  clearSessionStreamingState: (sessionId) => {
+    const buf = sessionBuffers.get(sessionId);
+    if (buf) {
+      if (buf.rafId) cancelAnimationFrame(buf.rafId);
+      sessionBuffers.delete(sessionId);
+    }
+    set((s) => {
+      const newStates = new Map(s.sessionStates);
+      const ss = newStates.get(sessionId);
+      if (ss) {
+        newStates.set(sessionId, {
+          ...ss,
+          streamingContent: "",
+          streamingReasoning: "",
+          streamingReasoningTokens: 0,
+          isStreaming: false,
+          isThinking: false,
+          ttftMs: null,
+        });
+      }
+      const topLevel: Partial<ChatState> = { sessionStates: newStates };
+      if (s.activeSessionId === sessionId) {
+        topLevel.streamingContent = "";
+        topLevel.streamingReasoning = "";
+        topLevel.streamingReasoningTokens = 0;
+        topLevel.isStreaming = false;
+        topLevel.isThinking = false;
+        topLevel.ttftMs = null;
+      }
+      return topLevel;
+    });
+  },
+
   appendMessage: (sessionId, message) => {
     set((s) => {
       const next = new Map(s.messages);
       const msgs = [...(next.get(sessionId) ?? []), message];
       next.set(sessionId, msgs);
-      return { messages: next, hasNewMessages: s.isUserScrolledUp };
+      const ss = s.sessionStates.get(sessionId) ?? createDefaultSessionState();
+      const hasNew = ss.isUserScrolledUp;
+      const newStates = new Map(s.sessionStates);
+      newStates.set(sessionId, { ...ss, hasNewMessages: hasNew });
+      return {
+        messages: next,
+        sessionStates: newStates,
+        hasNewMessages: s.activeSessionId === sessionId ? hasNew : s.hasNewMessages,
+      };
     });
   },
 
@@ -368,74 +554,82 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   },
 
   finalizeAssistantMessage: (sessionId, fallbackContent?) => {
-    // Guard: if not streaming, finalization already happened (prevents content doubling
-    // when both handleMessage and handleTurnEnd fire)
-    if (!get().isStreaming) return;
+    const ss = get().sessionStates.get(sessionId);
+    if (!ss?.isStreaming && !get().isStreaming) return;
 
-    // Flush any remaining buffers
-    if (rafId) {
-      cancelAnimationFrame(rafId);
-      rafId = null;
+    // Flush per-session buffers
+    const buf = getBuffer(sessionId);
+    if (buf.rafId) {
+      cancelAnimationFrame(buf.rafId);
+      buf.rafId = null;
     }
-    const pendingDelta = deltaBuffer + get().streamingContent;
-    const pendingReasoning = reasoningBuffer + get().streamingReasoning;
-    deltaBuffer = "";
-    reasoningBuffer = "";
-    turnStartTime = null;
+    const pendingDelta = buf.deltaBuffer + (ss?.streamingContent ?? "");
+    const pendingReasoning = buf.reasoningBuffer + (ss?.streamingReasoning ?? "");
+    buf.deltaBuffer = "";
+    buf.reasoningBuffer = "";
+    buf.turnStartTime = null;
 
-    // Use fallback content if no streaming deltas were received
-    const finalContent = pendingDelta || fallbackContent || "";
-
-    set((s) => {
-      const next = new Map(s.messages);
-      const msgs = next.get(sessionId);
-      if (!msgs || msgs.length === 0) return { isStreaming: false };
-      const last = msgs[msgs.length - 1]!;
-      if (last.role !== "assistant") return { isStreaming: false };
-
-      const blocks = [...last.blocks];
-
-      // Finalize streaming reasoning — insert before text content
-      if (pendingReasoning) {
-        const reasoningIdx = blocks.findIndex((b) => b.type === "reasoning");
-        if (reasoningIdx >= 0) {
-          const rb = blocks[reasoningIdx]!;
-          if (rb.type === "reasoning") {
-            blocks[reasoningIdx] = { ...rb, content: rb.content + pendingReasoning };
-          }
-        } else {
-          // No existing reasoning block — create one at the start (before text)
-          const insertIdx = blocks.findIndex((b) => b.type === "text");
-          const reasoningBlock = { type: "reasoning" as const, content: pendingReasoning, collapsed: false };
-          if (insertIdx >= 0) {
-            blocks.splice(insertIdx, 0, reasoningBlock);
-          } else {
-            blocks.push(reasoningBlock);
-          }
-        }
+    // Also flush legacy buffers if active session
+    if (get().activeSessionId === sessionId) {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
       }
+      const legacyDelta = deltaBuffer + get().streamingContent;
+      const legacyReasoning = reasoningBuffer + get().streamingReasoning;
+      deltaBuffer = "";
+      reasoningBuffer = "";
+      turnStartTime = null;
 
-      // Finalize streaming text (or use fallback content from assistant.message)
-      if (finalContent) {
-        const lastBlock = blocks[blocks.length - 1];
-        if (lastBlock?.type === "text") {
-          blocks[blocks.length - 1] = { ...lastBlock, content: lastBlock.content + finalContent };
-        } else {
-          blocks.push({ type: "text", content: finalContent });
+      // Use whichever has content
+      const finalContent = pendingDelta || legacyDelta || fallbackContent || "";
+      const finalReasoning = pendingReasoning || legacyReasoning;
+
+      set((s) => {
+        const next = new Map(s.messages);
+        const msgs = next.get(sessionId);
+        if (!msgs || msgs.length === 0) {
+          return syncSessionStreamClear(s, sessionId);
         }
-      }
+        const last = msgs[msgs.length - 1]!;
+        if (last.role !== "assistant") {
+          return syncSessionStreamClear(s, sessionId);
+        }
 
-      const updated = { ...last, blocks, isStreaming: false };
-      next.set(sessionId, [...msgs.slice(0, -1), updated]);
-      return {
-        messages: next,
-        isStreaming: false,
-        streamingContent: "",
-        streamingReasoning: "",
-        streamingReasoningTokens: 0,
-        isThinking: false,
-      };
-    });
+        const blocks = [...last.blocks];
+        finalizeBlocks(blocks, finalReasoning, finalContent);
+
+        const updated = { ...last, blocks, isStreaming: false };
+        next.set(sessionId, [...msgs.slice(0, -1), updated]);
+        return {
+          messages: next,
+          ...syncSessionStreamClear(s, sessionId),
+        };
+      });
+    } else {
+      const finalContent = pendingDelta || fallbackContent || "";
+      set((s) => {
+        const next = new Map(s.messages);
+        const msgs = next.get(sessionId);
+        if (!msgs || msgs.length === 0) {
+          return syncSessionStreamClear(s, sessionId);
+        }
+        const last = msgs[msgs.length - 1]!;
+        if (last.role !== "assistant") {
+          return syncSessionStreamClear(s, sessionId);
+        }
+
+        const blocks = [...last.blocks];
+        finalizeBlocks(blocks, pendingReasoning, finalContent);
+
+        const updated = { ...last, blocks, isStreaming: false };
+        next.set(sessionId, [...msgs.slice(0, -1), updated]);
+        return {
+          messages: next,
+          ...syncSessionStreamClear(s, sessionId),
+        };
+      });
+    }
   },
 
   reviseTo: (messageIndex) => {
@@ -446,10 +640,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const msg = msgs[messageIndex];
     if (!msg || msg.role !== "user") return;
 
-    // Extract the text from the user message so the input can be pre-populated
     const textBlock = msg.blocks.find((b) => b.type === "text");
     if (textBlock && textBlock.type === "text") {
-      // Store the revision target — the chat page keyboard handler reads this
       set({ revisionDraft: textBlock.content, revisionSourceIndex: messageIndex });
     }
   },
@@ -464,6 +656,16 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       decision: { kind: approved ? "approved" : "denied-interactively-by-user" },
     });
     set({ pendingPermission: null });
+    // Also clear from session states
+    set((s) => {
+      const newStates = new Map(s.sessionStates);
+      for (const [sid, ss] of newStates) {
+        if (ss.pendingPermission?.requestId === requestId) {
+          newStates.set(sid, { ...ss, pendingPermission: null });
+        }
+      }
+      return { sessionStates: newStates };
+    });
   },
 
   respondToInput: (requestId, answer) => {
@@ -471,6 +673,15 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     if (!socket) return;
     socket.emit("chat:input", { requestId, answer });
     set({ pendingInput: null });
+    set((s) => {
+      const newStates = new Map(s.sessionStates);
+      for (const [sid, ss] of newStates) {
+        if (ss.pendingInput?.requestId === requestId) {
+          newStates.set(sid, { ...ss, pendingInput: null });
+        }
+      }
+      return { sessionStates: newStates };
+    });
   },
 
   respondToElicitation: (requestId, data) => {
@@ -478,6 +689,46 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     if (!socket) return;
     socket.emit("chat:elicitation", { requestId, data });
     set({ pendingElicitation: null });
+    set((s) => {
+      const newStates = new Map(s.sessionStates);
+      for (const [sid, ss] of newStates) {
+        if (ss.pendingElicitation?.requestId === requestId) {
+          newStates.set(sid, { ...ss, pendingElicitation: null });
+        }
+      }
+      return { sessionStates: newStates };
+    });
+  },
+
+  getSessionState: (sessionId) => {
+    return get().sessionStates.get(sessionId) ?? createDefaultSessionState();
+  },
+
+  updateSessionState: (sessionId, updates) => {
+    set((s) => {
+      const newStates = new Map(s.sessionStates);
+      const ss = newStates.get(sessionId) ?? createDefaultSessionState();
+      newStates.set(sessionId, { ...ss, ...updates });
+      const topLevel: Partial<ChatState> = { sessionStates: newStates };
+      // Sync to top-level if active session
+      if (s.activeSessionId === sessionId) {
+        if (updates.isStreaming !== undefined) topLevel.isStreaming = updates.isStreaming;
+        if (updates.streamingContent !== undefined) topLevel.streamingContent = updates.streamingContent;
+        if (updates.streamingReasoning !== undefined) topLevel.streamingReasoning = updates.streamingReasoning;
+        if (updates.streamingReasoningTokens !== undefined) topLevel.streamingReasoningTokens = updates.streamingReasoningTokens;
+        if (updates.isThinking !== undefined) topLevel.isThinking = updates.isThinking;
+        if (updates.ttftMs !== undefined) topLevel.ttftMs = updates.ttftMs;
+        if (updates.activeTools !== undefined) topLevel.activeTools = updates.activeTools;
+        if (updates.activeSubagents !== undefined) topLevel.activeSubagents = updates.activeSubagents;
+        if (updates.pendingPermission !== undefined) topLevel.pendingPermission = updates.pendingPermission;
+        if (updates.pendingInput !== undefined) topLevel.pendingInput = updates.pendingInput;
+        if (updates.pendingElicitation !== undefined) topLevel.pendingElicitation = updates.pendingElicitation;
+        if (updates.contextWindowPct !== undefined) topLevel.contextWindowPct = updates.contextWindowPct;
+        if (updates.isUserScrolledUp !== undefined) topLevel.isUserScrolledUp = updates.isUserScrolledUp;
+        if (updates.hasNewMessages !== undefined) topLevel.hasNewMessages = updates.hasNewMessages;
+      }
+      return topLevel;
+    });
   },
 
   reset: () => {
@@ -488,11 +739,17 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     deltaBuffer = "";
     reasoningBuffer = "";
     turnStartTime = null;
+    // Clean up per-session buffers
+    for (const buf of sessionBuffers.values()) {
+      if (buf.rafId) cancelAnimationFrame(buf.rafId);
+    }
+    sessionBuffers.clear();
     set({
       sessions: [],
       sessionsFetched: false,
       activeSessionId: null,
       messages: new Map(),
+      sessionStates: new Map(),
       streamingContent: "",
       streamingReasoning: "",
       streamingReasoningTokens: 0,
@@ -516,7 +773,95 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Socket.IO chat event binding hook
+// Helper: finalize blocks with accumulated content
+// ---------------------------------------------------------------------------
+
+function finalizeBlocks(blocks: ContentBlock[], reasoning: string, content: string): void {
+  if (reasoning) {
+    const reasoningIdx = blocks.findIndex((b) => b.type === "reasoning");
+    if (reasoningIdx >= 0) {
+      const rb = blocks[reasoningIdx]!;
+      if (rb.type === "reasoning") {
+        blocks[reasoningIdx] = { ...rb, content: rb.content + reasoning };
+      }
+    } else {
+      const insertIdx = blocks.findIndex((b) => b.type === "text");
+      const reasoningBlock = { type: "reasoning" as const, content: reasoning, collapsed: false };
+      if (insertIdx >= 0) {
+        blocks.splice(insertIdx, 0, reasoningBlock);
+      } else {
+        blocks.push(reasoningBlock);
+      }
+    }
+  }
+
+  if (content) {
+    const lastBlock = blocks[blocks.length - 1];
+    if (lastBlock?.type === "text") {
+      blocks[blocks.length - 1] = { ...lastBlock, content: lastBlock.content + content };
+    } else {
+      blocks.push({ type: "text", content });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: clear streaming state for a session + sync top-level
+// ---------------------------------------------------------------------------
+
+function syncSessionStreamClear(s: ChatState, sessionId: string): Partial<ChatState> {
+  const newStates = new Map(s.sessionStates);
+  const ss = newStates.get(sessionId);
+  if (ss) {
+    newStates.set(sessionId, {
+      ...ss,
+      streamingContent: "",
+      streamingReasoning: "",
+      streamingReasoningTokens: 0,
+      isStreaming: false,
+      isThinking: false,
+    });
+  }
+  const result: Partial<ChatState> = { sessionStates: newStates };
+  if (s.activeSessionId === sessionId) {
+    result.isStreaming = false;
+    result.streamingContent = "";
+    result.streamingReasoning = "";
+    result.streamingReasoningTokens = 0;
+    result.isThinking = false;
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Session-scoped event handlers (ADR-052 §2.5)
+// ---------------------------------------------------------------------------
+
+export function onSessionMessageDelta(sessionId: string, delta: string): void {
+  const buf = getBuffer(sessionId);
+  buf.deltaBuffer += delta;
+  scheduleSessionFlush(sessionId, useChatStore.setState.bind(useChatStore));
+}
+
+export function onSessionReasoningDelta(sessionId: string, delta: string): void {
+  const buf = getBuffer(sessionId);
+  buf.reasoningBuffer += delta;
+  scheduleSessionFlush(sessionId, useChatStore.setState.bind(useChatStore));
+}
+
+export function onSessionTurnStart(sessionId: string): void {
+  const buf = getBuffer(sessionId);
+  buf.turnStartTime = performance.now();
+  useChatStore.getState().updateSessionState(sessionId, {
+    isStreaming: true,
+    ttftMs: null,
+    streamingContent: "",
+    streamingReasoning: "",
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Legacy event handlers (backward compat with existing socket binding)
 // ---------------------------------------------------------------------------
 
 export function onMessageDelta(delta: string): void {
@@ -538,4 +883,14 @@ export function onVisibilityChange(): void {
   if (!document.hidden && (deltaBuffer || reasoningBuffer)) {
     flushBuffers(useChatStore.setState.bind(useChatStore));
   }
+  // Also flush per-session buffers
+  if (!document.hidden) {
+    for (const [sid, buf] of sessionBuffers) {
+      if (buf.deltaBuffer || buf.reasoningBuffer) {
+        flushSessionBuffers(sid, useChatStore.setState.bind(useChatStore));
+      }
+    }
+  }
 }
+
+export { createDefaultSessionState };

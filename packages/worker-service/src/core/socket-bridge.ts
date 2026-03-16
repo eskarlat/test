@@ -105,14 +105,23 @@ export function attachSocketBridge(io: Server): void {
       logger.debug("socket", `${socket.id} left automation:${runId}`);
     });
 
-    // Chat event handlers — CopilotBridge integration (ADR-047 §4, ADR-048)
+    // Chat event handlers — CopilotBridge integration (ADR-047 §4, ADR-048, ADR-052 §2.6)
+    // withSession resolves the target session ID. When an explicit sessionId is
+    // provided in the event payload (multi-pane), it is used after validating the
+    // socket has joined that room. Otherwise, falls back to room inference for
+    // backward compatibility with single-pane clients.
     const withSession = (
       eventName: string,
       fn: (sessionId: string) => Promise<void>,
+      explicitSessionId: string | undefined,
       ack?: (res: { ok: boolean; error?: string }) => void,
     ): void => {
-      const sessionId = getSessionFromSocket(socket);
+      const sessionId = explicitSessionId ?? getSessionFromSocket(socket);
       if (!sessionId) { ack?.({ ok: false, error: "Not joined to a chat session" }); return; }
+      if (explicitSessionId && !socket.rooms.has(`chat:${explicitSessionId}`)) {
+        ack?.({ ok: false, error: "Not joined to the specified chat session" });
+        return;
+      }
       fn(sessionId)
         .then(() => ack?.({ ok: true }))
         .catch((err: unknown) => {
@@ -122,12 +131,12 @@ export function attachSocketBridge(io: Server): void {
         });
     };
 
-    socket.on("chat:send", (data: { prompt: string; attachments?: Array<{ type: string; path: string; displayName?: string }> }, ack?: (res: { ok: boolean; error?: string }) => void) => {
-      withSession("chat:send", (sid) => copilotBridge.sendMessage(sid, data.prompt, data.attachments as Array<{ type: "file" | "directory" | "selection"; path: string; displayName?: string }>), ack);
+    socket.on("chat:send", (data: { prompt: string; sessionId?: string; attachments?: Array<{ type: string; path: string; displayName?: string }> }, ack?: (res: { ok: boolean; error?: string }) => void) => {
+      withSession("chat:send", (sid) => copilotBridge.sendMessage(sid, data.prompt, data.attachments as Array<{ type: "file" | "directory" | "selection"; path: string; displayName?: string }>), data.sessionId, ack);
     });
 
-    socket.on("chat:cancel", (_data: unknown, ack?: (res: { ok: boolean; error?: string }) => void) => {
-      withSession("chat:cancel", (sid) => copilotBridge.cancelGeneration(sid), ack);
+    socket.on("chat:cancel", (data: { sessionId?: string }, ack?: (res: { ok: boolean; error?: string }) => void) => {
+      withSession("chat:cancel", (sid) => copilotBridge.cancelGeneration(sid), data?.sessionId, ack);
     });
 
     socket.on("chat:permission", (data: { requestId: string; decision: PermissionRequestResult }) => {

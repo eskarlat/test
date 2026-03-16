@@ -146,6 +146,15 @@ export interface ChatToolDefinition {
   description: string;
   parameters: Record<string, unknown>;
   endpoint: string; // "GET /path" or "POST /path"
+  /** Optional display hints for Console UI chat tool rendering (ADR-052 §1.6) */
+  toolDisplay?: {
+    /** Mustache-style intent template, e.g. "Deploy to {{environment}}" */
+    intent?: string;
+    /** Argument keys to show in standard mode */
+    keyArgs?: string[];
+    /** Result summary mode: "short" = first line, or omit for fallback */
+    resultSummary?: string;
+  };
 }
 
 export interface ChatAgentDefinition {
