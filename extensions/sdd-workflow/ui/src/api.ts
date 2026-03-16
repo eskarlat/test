@@ -1,4 +1,4 @@
-import type { TaskInfo, FileInfo, FileContent, ReviewResponse, InlineComment } from "./types.js";
+import type { TaskInfo, FileInfo, FileContent, ReviewResponse } from "./types.js";
 
 async function request<T>(base: string, path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${base}${path}`, {

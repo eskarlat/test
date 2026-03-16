@@ -30,7 +30,8 @@ function SourceView({
   const commentsByLine = useMemo(() => {
     const map: Record<number, InlineComment[]> = {};
     for (const c of comments) {
-      (map[c.lineNumber] ??= []).push(c);
+      const bucket = map[c.lineNumber] ??= [];
+      bucket.push(c);
     }
     return map;
   }, [comments]);

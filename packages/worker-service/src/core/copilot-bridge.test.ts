@@ -1017,7 +1017,7 @@ describe("CopilotBridge", () => {
 
       // Extract the user input handler from session config
       const configAny = mockClientCreateSession.mock.calls[0]?.[0] as Record<string, unknown>;
-      const inputHandler = configAny["onUserInputRequest"] as Function;
+      const inputHandler = configAny["onUserInputRequest"] as (...args: unknown[]) => unknown;
 
       const inputPromise = inputHandler(
         { question: "Pick a color", choices: ["red", "blue"] },
@@ -1053,7 +1053,7 @@ describe("CopilotBridge", () => {
       const sessionId = await bridge.createChatSession({ projectId: "proj-1" });
 
       const configAny = mockClientCreateSession.mock.calls[0]?.[0] as Record<string, unknown>;
-      const inputHandler = configAny["onUserInputRequest"] as Function;
+      const inputHandler = configAny["onUserInputRequest"] as (...args: unknown[]) => unknown;
 
       const inputPromise = inputHandler(
         { question: "What?" },

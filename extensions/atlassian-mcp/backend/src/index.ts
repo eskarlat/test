@@ -2,6 +2,7 @@ import type { ExtensionRouterFactory } from "@renre-kit/extension-sdk";
 import { Router } from "express";
 
 function createJiraClient(config: Record<string, string>) {
+  // eslint-disable-next-line sonarjs/slow-regex -- /\/+$/ on short URL strings is safe
   const baseUrl = config["atlassian_jira_url"]?.replace(/\/+$/, "");
   const email = config["atlassian_email"];
   const token = config["atlassian_api_token"];

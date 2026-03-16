@@ -266,8 +266,7 @@ describe("mcp-manager", () => {
     });
 
     it("is a no-op for non-existent project", () => {
-      // Should not throw
-      mcpManager.disconnect("nonexistent-project", "ext");
+      expect(() => mcpManager.disconnect("nonexistent-project", "ext")).not.toThrow();
     });
 
     it("is a no-op for non-existent extension", () => {
@@ -306,8 +305,7 @@ describe("mcp-manager", () => {
     });
 
     it("is a no-op for non-existent project", () => {
-      // Should not throw
-      mcpManager.disconnectAll("nonexistent");
+      expect(() => mcpManager.disconnectAll("nonexistent")).not.toThrow();
     });
   });
 

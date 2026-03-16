@@ -156,15 +156,13 @@ describe("backup command", () => {
 
   describe("backup list", () => {
     it("shows message when no backups directory exists", async () => {
-      await runBackup("list");
-      // No error thrown, info message logged
+      await expect(runBackup("list")).resolves.not.toThrow();
     });
 
     it("shows message when backups directory is empty", async () => {
       vol.mkdirSync("/home/user/.renre-kit/backups", { recursive: true });
 
-      await runBackup("list");
-      // No error, info message logged
+      await expect(runBackup("list")).resolves.not.toThrow();
     });
 
     it("lists .db files sorted by mtime", async () => {

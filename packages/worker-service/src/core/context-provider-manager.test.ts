@@ -104,8 +104,7 @@ describe("context-provider-manager", () => {
   });
 
   it("unregister handles missing extension gracefully", () => {
-    // Should not throw
-    unregisterExtensionProvider("nonexistent");
+    expect(() => unregisterExtensionProvider("nonexistent")).not.toThrow();
   });
 
   it("listProviders returns empty array on error", () => {

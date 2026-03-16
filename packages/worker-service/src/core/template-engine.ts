@@ -6,7 +6,8 @@
  */
 export function resolveTemplate(template: string, vars: Record<string, string>): string {
   // Single-pass: replace all {{key}} in one replace() call
-  const result = template.replace(/\{\{(.+?)\}\}/g, (_match, key: string) => {
+  // eslint-disable-next-line sonarjs/slow-regex -- character class [^}] is linear, not vulnerable to backtracking
+  const result = template.replace(/\{\{([^}]+)\}\}/g, (_match, key: string) => {
     const trimmed = key.trim();
     const value = vars[trimmed];
     return value !== undefined ? value : `{{${key}}}`;

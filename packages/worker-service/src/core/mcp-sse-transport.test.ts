@@ -79,7 +79,7 @@ describe("SSETransport", () => {
     const transport = new SSETransport("http://localhost:3000/sse", {});
     transport.close();
     // Second close should be safe
-    transport.close();
+    expect(() => transport.close()).not.toThrow();
   });
 
   it("emits disconnected on fetch error", async () => {

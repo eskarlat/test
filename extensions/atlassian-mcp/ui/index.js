@@ -78,8 +78,7 @@ function adfToText(node) {
   }
 }
 
-// ui/src/components/IssueRow.tsx
-import { jsx, jsxs } from "react/jsx-runtime";
+// ui/src/components/utils.ts
 function statusColor(colorName) {
   switch (colorName) {
     case "blue-gray":
@@ -106,6 +105,9 @@ function timeAgo(dateStr) {
   if (days < 30) return `${days}d ago`;
   return new Date(dateStr).toLocaleDateString();
 }
+
+// ui/src/components/IssueRow.tsx
+import { jsx, jsxs } from "react/jsx-runtime";
 function IssueRow({ issue, onClick }) {
   const { fields } = issue;
   return /* @__PURE__ */ jsxs(
@@ -167,32 +169,6 @@ function IssueRow({ issue, onClick }) {
 // ui/src/components/IssueDetail.tsx
 import { useEffect, useState, useCallback } from "react";
 import { Fragment, jsx as jsx2, jsxs as jsxs2 } from "react/jsx-runtime";
-function timeAgo2(dateStr) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const minutes = Math.floor(diff / 6e4);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString();
-}
-function statusColor2(colorName) {
-  switch (colorName) {
-    case "blue-gray":
-    case "default":
-      return "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
-    case "blue":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
-    case "green":
-      return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-    case "yellow":
-      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
-    default:
-      return "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
-  }
-}
 function CommentItem({ comment }) {
   const bodyText = adfToText(comment.body).trim();
   return /* @__PURE__ */ jsxs2("div", { className: "flex gap-3 py-3 border-b border-border last:border-0", children: [
@@ -207,7 +183,7 @@ function CommentItem({ comment }) {
     /* @__PURE__ */ jsxs2("div", { className: "flex-1 min-w-0", children: [
       /* @__PURE__ */ jsxs2("div", { className: "flex items-center gap-2 mb-1", children: [
         /* @__PURE__ */ jsx2("span", { className: "text-sm font-medium", children: comment.author.displayName }),
-        /* @__PURE__ */ jsx2("span", { className: "text-xs text-muted-foreground", children: timeAgo2(comment.created) }),
+        /* @__PURE__ */ jsx2("span", { className: "text-xs text-muted-foreground", children: timeAgo(comment.created) }),
         comment.created !== comment.updated && /* @__PURE__ */ jsx2("span", { className: "text-xs text-muted-foreground italic", children: "edited" })
       ] }),
       /* @__PURE__ */ jsx2("p", { className: "text-sm text-foreground whitespace-pre-wrap", children: bodyText })
@@ -310,7 +286,7 @@ function IssueDetail({ apiBaseUrl, issueKey, onBack }) {
           /* @__PURE__ */ jsx2(
             "span",
             {
-              className: `text-[11px] font-medium px-2 py-0.5 rounded-full ${statusColor2(fields.status.statusCategory.colorName)}`,
+              className: `text-[11px] font-medium px-2 py-0.5 rounded-full ${statusColor(fields.status.statusCategory.colorName)}`,
               children: fields.status.name
             }
           ),
@@ -358,11 +334,11 @@ function IssueDetail({ apiBaseUrl, issueKey, onBack }) {
       ] }),
       /* @__PURE__ */ jsxs2("div", { children: [
         /* @__PURE__ */ jsx2("dt", { className: "text-xs text-muted-foreground mb-1", children: "Created" }),
-        /* @__PURE__ */ jsx2("dd", { className: "text-sm", children: timeAgo2(fields.created) })
+        /* @__PURE__ */ jsx2("dd", { className: "text-sm", children: timeAgo(fields.created) })
       ] }),
       /* @__PURE__ */ jsxs2("div", { children: [
         /* @__PURE__ */ jsx2("dt", { className: "text-xs text-muted-foreground mb-1", children: "Updated" }),
-        /* @__PURE__ */ jsx2("dd", { className: "text-sm", children: timeAgo2(fields.updated) })
+        /* @__PURE__ */ jsx2("dd", { className: "text-sm", children: timeAgo(fields.updated) })
       ] })
     ] }),
     fields.labels.length > 0 && /* @__PURE__ */ jsx2("div", { className: "flex flex-wrap gap-1.5 mb-6", children: fields.labels.map((label) => /* @__PURE__ */ jsx2(
@@ -515,65 +491,70 @@ function IssuesPage({ apiBaseUrl }) {
         f.key
       )) })
     ] }),
-    /* @__PURE__ */ jsx3("div", { className: "flex-1 overflow-auto", children: loading ? /* @__PURE__ */ jsx3("div", { className: "p-6 space-y-3", children: Array.from({ length: 5 }).map((_, i) => /* @__PURE__ */ jsx3("div", { className: "h-12 bg-muted animate-pulse rounded" }, i)) }) : error ? /* @__PURE__ */ jsx3("div", { className: "p-6", children: /* @__PURE__ */ jsx3("div", { className: "rounded-md bg-destructive/10 border border-destructive/20 p-4 text-sm text-destructive", children: error }) }) : issues.length === 0 ? /* @__PURE__ */ jsxs3("div", { className: "flex flex-col items-center justify-center py-16 text-muted-foreground", children: [
-      /* @__PURE__ */ jsxs3(
-        "svg",
-        {
-          xmlns: "http://www.w3.org/2000/svg",
-          width: "40",
-          height: "40",
-          viewBox: "0 0 24 24",
-          fill: "none",
-          stroke: "currentColor",
-          strokeWidth: "1.5",
-          strokeLinecap: "round",
-          strokeLinejoin: "round",
-          className: "mb-3 opacity-40",
-          children: [
-            /* @__PURE__ */ jsx3("circle", { cx: "11", cy: "11", r: "8" }),
-            /* @__PURE__ */ jsx3("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" })
-          ]
-        }
-      ),
-      /* @__PURE__ */ jsx3("p", { className: "text-sm", children: "No issues found" }),
-      /* @__PURE__ */ jsx3("p", { className: "text-xs mt-1", children: "Try adjusting your JQL query" })
-    ] }) : /* @__PURE__ */ jsxs3(Fragment2, { children: [
-      /* @__PURE__ */ jsxs3("div", { className: "px-4 py-2 text-xs text-muted-foreground border-b border-border bg-muted/30", children: [
-        total,
-        " issue",
-        total !== 1 ? "s" : "",
-        " found",
-        totalPages > 1 && ` \u2014 page ${page + 1} of ${totalPages}`
-      ] }),
-      /* @__PURE__ */ jsx3("div", { children: issues.map((issue) => /* @__PURE__ */ jsx3(IssueRow, { issue, onClick: setSelectedKey }, issue.id)) }),
-      totalPages > 1 && /* @__PURE__ */ jsxs3("div", { className: "flex items-center justify-center gap-2 py-4 border-t border-border", children: [
-        /* @__PURE__ */ jsx3(
-          "button",
+    /* @__PURE__ */ jsxs3("div", { className: "flex-1 overflow-auto", children: [
+      loading && /* @__PURE__ */ jsx3("div", { className: "p-6 space-y-3", children: Array.from({ length: 5 }).map((_, i) => /* @__PURE__ */ jsx3("div", { className: "h-12 bg-muted animate-pulse rounded" }, i)) }),
+      !loading && error && /* @__PURE__ */ jsx3("div", { className: "p-6", children: /* @__PURE__ */ jsx3("div", { className: "rounded-md bg-destructive/10 border border-destructive/20 p-4 text-sm text-destructive", children: error }) }),
+      !loading && !error && issues.length === 0 && /* @__PURE__ */ jsxs3("div", { className: "flex flex-col items-center justify-center py-16 text-muted-foreground", children: [
+        /* @__PURE__ */ jsxs3(
+          "svg",
           {
-            type: "button",
-            onClick: () => setPage((p) => Math.max(0, p - 1)),
-            disabled: page === 0,
-            className: "px-3 py-1 text-xs rounded-md border border-border bg-background hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors",
-            children: "Previous"
+            xmlns: "http://www.w3.org/2000/svg",
+            width: "40",
+            height: "40",
+            viewBox: "0 0 24 24",
+            fill: "none",
+            stroke: "currentColor",
+            strokeWidth: "1.5",
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+            className: "mb-3 opacity-40",
+            children: [
+              /* @__PURE__ */ jsx3("circle", { cx: "11", cy: "11", r: "8" }),
+              /* @__PURE__ */ jsx3("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" })
+            ]
           }
         ),
-        /* @__PURE__ */ jsxs3("span", { className: "text-xs text-muted-foreground", children: [
-          page + 1,
-          " / ",
-          totalPages
+        /* @__PURE__ */ jsx3("p", { className: "text-sm", children: "No issues found" }),
+        /* @__PURE__ */ jsx3("p", { className: "text-xs mt-1", children: "Try adjusting your JQL query" })
+      ] }),
+      !loading && !error && issues.length > 0 && /* @__PURE__ */ jsxs3(Fragment2, { children: [
+        /* @__PURE__ */ jsxs3("div", { className: "px-4 py-2 text-xs text-muted-foreground border-b border-border bg-muted/30", children: [
+          total,
+          " issue",
+          total !== 1 ? "s" : "",
+          " found",
+          totalPages > 1 && ` \u2014 page ${page + 1} of ${totalPages}`
         ] }),
-        /* @__PURE__ */ jsx3(
-          "button",
-          {
-            type: "button",
-            onClick: () => setPage((p) => Math.min(totalPages - 1, p + 1)),
-            disabled: page >= totalPages - 1,
-            className: "px-3 py-1 text-xs rounded-md border border-border bg-background hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors",
-            children: "Next"
-          }
-        )
+        /* @__PURE__ */ jsx3("div", { children: issues.map((issue) => /* @__PURE__ */ jsx3(IssueRow, { issue, onClick: setSelectedKey }, issue.id)) }),
+        totalPages > 1 && /* @__PURE__ */ jsxs3("div", { className: "flex items-center justify-center gap-2 py-4 border-t border-border", children: [
+          /* @__PURE__ */ jsx3(
+            "button",
+            {
+              type: "button",
+              onClick: () => setPage((p) => Math.max(0, p - 1)),
+              disabled: page === 0,
+              className: "px-3 py-1 text-xs rounded-md border border-border bg-background hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors",
+              children: "Previous"
+            }
+          ),
+          /* @__PURE__ */ jsxs3("span", { className: "text-xs text-muted-foreground", children: [
+            page + 1,
+            " / ",
+            totalPages
+          ] }),
+          /* @__PURE__ */ jsx3(
+            "button",
+            {
+              type: "button",
+              onClick: () => setPage((p) => Math.min(totalPages - 1, p + 1)),
+              disabled: page >= totalPages - 1,
+              className: "px-3 py-1 text-xs rounded-md border border-border bg-background hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors",
+              children: "Next"
+            }
+          )
+        ] })
       ] })
-    ] }) })
+    ] })
   ] });
 }
 
@@ -655,68 +636,73 @@ function MentionsPage({ apiBaseUrl }) {
         tab.key
       )) })
     ] }),
-    /* @__PURE__ */ jsx4("div", { className: "flex-1 overflow-auto", children: loading ? /* @__PURE__ */ jsx4("div", { className: "p-6 space-y-3", children: Array.from({ length: 5 }).map((_, i) => /* @__PURE__ */ jsx4("div", { className: "h-12 bg-muted animate-pulse rounded" }, i)) }) : error ? /* @__PURE__ */ jsx4("div", { className: "p-6", children: /* @__PURE__ */ jsx4("div", { className: "rounded-md bg-destructive/10 border border-destructive/20 p-4 text-sm text-destructive", children: error }) }) : issues.length === 0 ? /* @__PURE__ */ jsxs4("div", { className: "flex flex-col items-center justify-center py-16 text-muted-foreground", children: [
-      /* @__PURE__ */ jsxs4(
-        "svg",
-        {
-          xmlns: "http://www.w3.org/2000/svg",
-          width: "40",
-          height: "40",
-          viewBox: "0 0 24 24",
-          fill: "none",
-          stroke: "currentColor",
-          strokeWidth: "1.5",
-          strokeLinecap: "round",
-          strokeLinejoin: "round",
-          className: "mb-3 opacity-40",
-          children: [
-            /* @__PURE__ */ jsx4("path", { d: "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" }),
-            /* @__PURE__ */ jsx4("path", { d: "M13.73 21a2 2 0 0 1-3.46 0" })
-          ]
-        }
-      ),
-      /* @__PURE__ */ jsx4("p", { className: "text-sm", children: "No issues found" }),
-      /* @__PURE__ */ jsxs4("p", { className: "text-xs mt-1", children: [
-        activeTab === "assigned" && "You have no open assigned issues",
-        activeTab === "reported" && "You haven't reported any issues",
-        activeTab === "watching" && "You're not watching any issues"
-      ] })
-    ] }) : /* @__PURE__ */ jsxs4(Fragment3, { children: [
-      /* @__PURE__ */ jsxs4("div", { className: "px-4 py-2 text-xs text-muted-foreground border-b border-border bg-muted/30", children: [
-        total,
-        " issue",
-        total !== 1 ? "s" : "",
-        totalPages > 1 && ` \u2014 page ${page + 1} of ${totalPages}`
-      ] }),
-      /* @__PURE__ */ jsx4("div", { children: issues.map((issue) => /* @__PURE__ */ jsx4(IssueRow, { issue, onClick: setSelectedKey }, issue.id)) }),
-      totalPages > 1 && /* @__PURE__ */ jsxs4("div", { className: "flex items-center justify-center gap-2 py-4 border-t border-border", children: [
-        /* @__PURE__ */ jsx4(
-          "button",
+    /* @__PURE__ */ jsxs4("div", { className: "flex-1 overflow-auto", children: [
+      loading && /* @__PURE__ */ jsx4("div", { className: "p-6 space-y-3", children: Array.from({ length: 5 }).map((_, i) => /* @__PURE__ */ jsx4("div", { className: "h-12 bg-muted animate-pulse rounded" }, i)) }),
+      !loading && error && /* @__PURE__ */ jsx4("div", { className: "p-6", children: /* @__PURE__ */ jsx4("div", { className: "rounded-md bg-destructive/10 border border-destructive/20 p-4 text-sm text-destructive", children: error }) }),
+      !loading && !error && issues.length === 0 && /* @__PURE__ */ jsxs4("div", { className: "flex flex-col items-center justify-center py-16 text-muted-foreground", children: [
+        /* @__PURE__ */ jsxs4(
+          "svg",
           {
-            type: "button",
-            onClick: () => setPage((p) => Math.max(0, p - 1)),
-            disabled: page === 0,
-            className: "px-3 py-1 text-xs rounded-md border border-border bg-background hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors",
-            children: "Previous"
+            xmlns: "http://www.w3.org/2000/svg",
+            width: "40",
+            height: "40",
+            viewBox: "0 0 24 24",
+            fill: "none",
+            stroke: "currentColor",
+            strokeWidth: "1.5",
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+            className: "mb-3 opacity-40",
+            children: [
+              /* @__PURE__ */ jsx4("path", { d: "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" }),
+              /* @__PURE__ */ jsx4("path", { d: "M13.73 21a2 2 0 0 1-3.46 0" })
+            ]
           }
         ),
-        /* @__PURE__ */ jsxs4("span", { className: "text-xs text-muted-foreground", children: [
-          page + 1,
-          " / ",
-          totalPages
+        /* @__PURE__ */ jsx4("p", { className: "text-sm", children: "No issues found" }),
+        /* @__PURE__ */ jsxs4("p", { className: "text-xs mt-1", children: [
+          activeTab === "assigned" && "You have no open assigned issues",
+          activeTab === "reported" && "You haven't reported any issues",
+          activeTab === "watching" && "You're not watching any issues"
+        ] })
+      ] }),
+      !loading && !error && issues.length > 0 && /* @__PURE__ */ jsxs4(Fragment3, { children: [
+        /* @__PURE__ */ jsxs4("div", { className: "px-4 py-2 text-xs text-muted-foreground border-b border-border bg-muted/30", children: [
+          total,
+          " issue",
+          total !== 1 ? "s" : "",
+          totalPages > 1 && ` \u2014 page ${page + 1} of ${totalPages}`
         ] }),
-        /* @__PURE__ */ jsx4(
-          "button",
-          {
-            type: "button",
-            onClick: () => setPage((p) => Math.min(totalPages - 1, p + 1)),
-            disabled: page >= totalPages - 1,
-            className: "px-3 py-1 text-xs rounded-md border border-border bg-background hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors",
-            children: "Next"
-          }
-        )
+        /* @__PURE__ */ jsx4("div", { children: issues.map((issue) => /* @__PURE__ */ jsx4(IssueRow, { issue, onClick: setSelectedKey }, issue.id)) }),
+        totalPages > 1 && /* @__PURE__ */ jsxs4("div", { className: "flex items-center justify-center gap-2 py-4 border-t border-border", children: [
+          /* @__PURE__ */ jsx4(
+            "button",
+            {
+              type: "button",
+              onClick: () => setPage((p) => Math.max(0, p - 1)),
+              disabled: page === 0,
+              className: "px-3 py-1 text-xs rounded-md border border-border bg-background hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors",
+              children: "Previous"
+            }
+          ),
+          /* @__PURE__ */ jsxs4("span", { className: "text-xs text-muted-foreground", children: [
+            page + 1,
+            " / ",
+            totalPages
+          ] }),
+          /* @__PURE__ */ jsx4(
+            "button",
+            {
+              type: "button",
+              onClick: () => setPage((p) => Math.min(totalPages - 1, p + 1)),
+              disabled: page >= totalPages - 1,
+              className: "px-3 py-1 text-xs rounded-md border border-border bg-background hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors",
+              children: "Next"
+            }
+          )
+        ] })
       ] })
-    ] }) })
+    ] })
   ] });
 }
 

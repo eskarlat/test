@@ -22,8 +22,8 @@ export async function request(
   url: string,
   body?: unknown,
 ): Promise<{ status: number; body: unknown; headers: Record<string, string> }> {
-  return new Promise((resolve, reject) => {
-    const server = createServer(app);
+  const server = createServer(app);
+  const port = await new Promise<number>((resolve, reject) => {
     server.listen(0, () => {
       const addr = server.address();
       if (!addr || typeof addr === "string") {
@@ -31,36 +31,33 @@ export async function request(
         reject(new Error("Failed to start server"));
         return;
       }
-      const port = addr.port;
-      const options: RequestInit = {
-        method,
-        headers: { "Content-Type": "application/json" },
-      };
-      if (body !== undefined) {
-        options.body = JSON.stringify(body);
-      }
-      fetch(`http://localhost:${port}${url}`, options)
-        .then(async (res) => {
-          let responseBody: unknown;
-          const text = await res.text();
-          try {
-            responseBody = JSON.parse(text);
-          } catch {
-            responseBody = text || undefined;
-          }
-          const headers: Record<string, string> = {};
-          res.headers.forEach((val, key) => {
-            headers[key] = val;
-          });
-          server.close();
-          resolve({ status: res.status, body: responseBody, headers });
-        })
-        .catch((err) => {
-          server.close();
-          reject(err);
-        });
+      resolve(addr.port);
     });
   });
+  const options: RequestInit = {
+    method,
+    headers: { "Content-Type": "application/json" },
+  };
+  if (body !== undefined) {
+    options.body = JSON.stringify(body);
+  }
+  try {
+    const res = await fetch(`http://localhost:${port}${url}`, options);
+    const text = await res.text();
+    let responseBody: unknown;
+    try {
+      responseBody = JSON.parse(text);
+    } catch {
+      responseBody = text || undefined;
+    }
+    const headers: Record<string, string> = {};
+    res.headers.forEach((val, key) => {
+      headers[key] = val;
+    });
+    return { status: res.status, body: responseBody, headers };
+  } finally {
+    server.close();
+  }
 }
 
 /**

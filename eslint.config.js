@@ -3,7 +3,7 @@ import sonarjs from "eslint-plugin-sonarjs";
 
 export default tseslint.config(
   {
-    ignores: ["**/dist/**", "**/node_modules/**", "**/.turbo/**"],
+    ignores: ["**/dist/**", "**/node_modules/**", "**/.turbo/**", "**/coverage/**"],
   },
   ...tseslint.configs.recommended,
   sonarjs.configs.recommended,
@@ -22,6 +22,18 @@ export default tseslint.config(
 
       // Cognitive complexity — max 15 (sonarjs)
       "sonarjs/cognitive-complexity": ["warn", 15],
+    },
+  },
+  // Relaxed rules for test files
+  {
+    files: ["**/*.test.ts", "**/*.test.tsx"],
+    rules: {
+      // Test files frequently use `any` for mocks and type assertions
+      "@typescript-eslint/no-explicit-any": "warn",
+      // Test files use tmpdir() for temp directories — not a security concern
+      "sonarjs/publicly-writable-directories": "off",
+      // Test files may use Math.random() for unique identifiers
+      "sonarjs/pseudo-random": "off",
     },
   }
 );

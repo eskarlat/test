@@ -118,9 +118,8 @@ export default function ReviewChat({
             disabled={loading}
             className="w-full px-3 py-2 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
-            {comments.length > 0
-              ? `Review with ${comments.length} comment${comments.length !== 1 ? "s" : ""}`
-              : "Review this file"}
+            {comments.length === 0 && "Review this file"}
+            {comments.length > 0 && `Review with ${comments.length} comment${comments.length !== 1 ? "s" : ""}`}
           </button>
           {!filePath && (
             <p className="text-xs text-muted-foreground text-center">

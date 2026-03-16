@@ -19,14 +19,12 @@ vi.mock("./logger.js", () => ({
   },
 }));
 
-// eslint-disable-next-line sonarjs/publicly-writable-directories
 vi.mock("./paths.js", () => ({
-  // eslint-disable-next-line sonarjs/publicly-writable-directories
   globalPaths: () => ({
-    globalDir: "/tmp/renre-kit-test", // eslint-disable-line sonarjs/publicly-writable-directories
-    configFile: "/tmp/renre-kit-test/config.json", // eslint-disable-line sonarjs/publicly-writable-directories
-    dataDb: "/tmp/renre-kit-test/data.db", // eslint-disable-line sonarjs/publicly-writable-directories
-    logsDir: "/tmp/renre-kit-test/logs", // eslint-disable-line sonarjs/publicly-writable-directories
+    globalDir: "/tmp/renre-kit-test",
+    configFile: "/tmp/renre-kit-test/config.json",
+    dataDb: "/tmp/renre-kit-test/data.db",
+    logsDir: "/tmp/renre-kit-test/logs",
   }),
 }));
 
@@ -792,8 +790,7 @@ describe("ScopedScheduler", () => {
 
   describe("executeJob() edge cases", () => {
     it("does nothing for a non-existent job ID", async () => {
-      // Should not throw
-      await scheduler.executeJob("non-existent-id");
+      await expect(scheduler.executeJob("non-existent-id")).resolves.not.toThrow();
     });
 
     it("emits scheduler:run-completed event on success", async () => {

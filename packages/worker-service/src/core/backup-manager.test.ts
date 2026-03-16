@@ -31,7 +31,7 @@ import {
 
 describe("backup-manager", () => {
   beforeEach(() => {
-    testDir = join(tmpdir(), `bm-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    testDir = join(tmpdir(), `bm-test-${Date.now()}-${crypto.randomUUID()}`);
     dataDbPath = join(testDir, "data.db");
     backupsPath = join(testDir, "backups");
     mkdirSync(testDir, { recursive: true });
@@ -123,8 +123,7 @@ describe("backup-manager", () => {
     });
 
     it("handles missing backups dir", () => {
-      pruneBackups({ maxCount: 10, maxAgeDays: 30 });
-      // Should not throw
+      expect(() => pruneBackups({ maxCount: 10, maxAgeDays: 30 })).not.toThrow();
     });
   });
 

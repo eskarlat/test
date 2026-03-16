@@ -195,9 +195,9 @@ async function handleToolGovernance(
   const sessionId = resolveSessionId(sessionKey);
   const inputObj = input as Record<string, unknown> | null ?? {};
   // Claude Code sends snake_case; fall back to camelCase for other agents
-  const toolName =
-    typeof inputObj["tool_name"] === "string" ? inputObj["tool_name"] :
-    typeof inputObj["toolName"] === "string" ? inputObj["toolName"] : "unknown";
+  let toolName = "unknown";
+  if (typeof inputObj["tool_name"] === "string") toolName = inputObj["tool_name"];
+  else if (typeof inputObj["toolName"] === "string") toolName = inputObj["toolName"];
   const toolInput = JSON.stringify(inputObj["tool_input"] ?? inputObj["toolInput"] ?? {});
   const gov = await Promise.resolve(evaluateTool(projectId, sessionId ?? null, toolName, toolInput));
   if (gov.decision !== "allow") {
@@ -215,9 +215,9 @@ async function handleToolAnalytics(
   const sessionId = resolveSessionId(sessionKey);
   const inputObj = input as Record<string, unknown> | null ?? {};
   // Claude Code sends snake_case; fall back to camelCase for other agents
-  const toolName =
-    typeof inputObj["tool_name"] === "string" ? inputObj["tool_name"] :
-    typeof inputObj["toolName"] === "string" ? inputObj["toolName"] : "unknown";
+  let toolName = "unknown";
+  if (typeof inputObj["tool_name"] === "string") toolName = inputObj["tool_name"];
+  else if (typeof inputObj["toolName"] === "string") toolName = inputObj["toolName"];
   const argsJson = JSON.stringify(inputObj["tool_input"] ?? inputObj["toolInput"] ?? {});
   const resultJson = JSON.stringify(inputObj["tool_response"] ?? inputObj["toolOutput"] ?? {});
   const durationMs = typeof inputObj["durationMs"] === "number" ? inputObj["durationMs"] : undefined;
@@ -241,20 +241,23 @@ async function handleErrorIntelligence(
     typeof inputObj["error"] === "object" && inputObj["error"] !== null
       ? (inputObj["error"] as Record<string, unknown>)
       : null;
-  const message =
-    typeof inputObj["error_message"] === "string" ? inputObj["error_message"] :
-    typeof inputObj["message"] === "string" ? inputObj["message"] :
-    typeof errorObj?.["message"] === "string" ? errorObj["message"] : JSON.stringify(input);
-  const errorType =
-    typeof inputObj["error_type"] === "string" ? inputObj["error_type"] :
-    typeof inputObj["errorType"] === "string" ? inputObj["errorType"] :
-    typeof errorObj?.["name"] === "string" ? errorObj["name"] : "unknown";
-  const stack =
-    typeof inputObj["stack"] === "string" ? inputObj["stack"] :
-    typeof errorObj?.["stack"] === "string" ? errorObj["stack"] : undefined;
-  const toolName =
-    typeof inputObj["tool_name"] === "string" ? inputObj["tool_name"] :
-    typeof inputObj["toolName"] === "string" ? inputObj["toolName"] : undefined;
+  let message = JSON.stringify(input);
+  if (typeof inputObj["error_message"] === "string") message = inputObj["error_message"];
+  else if (typeof inputObj["message"] === "string") message = inputObj["message"];
+  else if (typeof errorObj?.["message"] === "string") message = errorObj["message"];
+
+  let errorType = "unknown";
+  if (typeof inputObj["error_type"] === "string") errorType = inputObj["error_type"];
+  else if (typeof inputObj["errorType"] === "string") errorType = inputObj["errorType"];
+  else if (typeof errorObj?.["name"] === "string") errorType = errorObj["name"];
+
+  let stack: string | undefined;
+  if (typeof inputObj["stack"] === "string") stack = inputObj["stack"];
+  else if (typeof errorObj?.["stack"] === "string") stack = errorObj["stack"];
+
+  let toolName: string | undefined;
+  if (typeof inputObj["tool_name"] === "string") toolName = inputObj["tool_name"];
+  else if (typeof inputObj["toolName"] === "string") toolName = inputObj["toolName"];
   if (sessionId) {
     await Promise.resolve(recordError(projectId, sessionId, errorType, message, stack, toolName));
   }
@@ -295,12 +298,14 @@ async function handleSubagentTrack(
   const sessionId = resolveSessionId(sessionKey);
   const inputObj = input as Record<string, unknown> | null ?? {};
   // Claude Code sends snake_case; fall back to camelCase for other agents
-  const agentType =
-    typeof inputObj["agent_type"] === "string" ? inputObj["agent_type"] :
-    typeof inputObj["agentType"] === "string" ? inputObj["agentType"] : "unknown";
-  const parentId =
-    typeof inputObj["parent_agent_id"] === "string" ? inputObj["parent_agent_id"] :
-    typeof inputObj["parentAgentId"] === "string" ? inputObj["parentAgentId"] : undefined;
+  let agentType = "unknown";
+  if (typeof inputObj["agent_type"] === "string") agentType = inputObj["agent_type"];
+  else if (typeof inputObj["agentType"] === "string") agentType = inputObj["agentType"];
+
+  let parentId: string | undefined;
+  if (typeof inputObj["parent_agent_id"] === "string") parentId = inputObj["parent_agent_id"];
+  else if (typeof inputObj["parentAgentId"] === "string") parentId = inputObj["parentAgentId"];
+
   const result = await Promise.resolve(
     recordSubagentStart(projectId, sessionId ?? null, agentType, parentId, JSON.stringify(input)),
   );
@@ -315,12 +320,13 @@ async function handleSubagentComplete(
   const sessionId = resolveSessionId(sessionKey);
   const inputObj = input as Record<string, unknown> | null ?? {};
   // Claude Code sends snake_case; fall back to camelCase for other agents
-  const agentType =
-    typeof inputObj["agent_type"] === "string" ? inputObj["agent_type"] :
-    typeof inputObj["agentType"] === "string" ? inputObj["agentType"] : "unknown";
-  const startId =
-    typeof inputObj["start_event_id"] === "string" ? inputObj["start_event_id"] :
-    typeof inputObj["startEventId"] === "string" ? inputObj["startEventId"] : undefined;
+  let agentType = "unknown";
+  if (typeof inputObj["agent_type"] === "string") agentType = inputObj["agent_type"];
+  else if (typeof inputObj["agentType"] === "string") agentType = inputObj["agentType"];
+
+  let startId: string | undefined;
+  if (typeof inputObj["start_event_id"] === "string") startId = inputObj["start_event_id"];
+  else if (typeof inputObj["startEventId"] === "string") startId = inputObj["startEventId"];
   await Promise.resolve(recordSubagentStop(projectId, sessionId ?? null, agentType, startId));
   return {};
 }

@@ -119,15 +119,13 @@ describe("MCPClientImpl", () => {
     });
 
     it("ignores responses with unknown IDs", () => {
-      // Should not throw
-      transport._simulateResponse(
+      expect(() => transport._simulateResponse(
         JSON.stringify({ jsonrpc: "2.0", id: 999, result: "stale" }),
-      );
+      )).not.toThrow();
     });
 
     it("ignores malformed JSON messages", () => {
-      // Should not throw
-      transport._simulateResponse("not valid json {{{");
+      expect(() => transport._simulateResponse("not valid json {{{")).not.toThrow();
     });
   });
 

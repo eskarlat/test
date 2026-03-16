@@ -31,7 +31,7 @@ describe("extension-loader", () => {
 
     it("removes matching extension entries", () => {
       // This just verifies it doesn't crash when cache is empty
-      invalidateExtensionModule("nonexistent");
+      expect(() => invalidateExtensionModule("nonexistent")).not.toThrow();
     });
   });
 });

@@ -397,11 +397,13 @@ describe("ToolGovernancePage", () => {
     // There are pattern type radios + decision radios + scope radios
     // Just click on the "allow" text's radio
     fireEvent.click(screen.getByLabelText("allow"));
+    expect(screen.getByLabelText("allow")).toBeChecked();
   });
 
   it("allows switching scope to global", () => {
     renderWithRouter();
     fireEvent.click(screen.getByText("Add Rule"));
     fireEvent.click(screen.getByLabelText("global"));
+    expect(screen.getByLabelText("global")).toBeChecked();
   });
 });

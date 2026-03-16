@@ -93,7 +93,7 @@ describe("context-monitor", () => {
     });
 
     it("no-ops for unknown session", () => {
-      markSuggested("unknown"); // should not throw
+      expect(() => markSuggested("unknown")).not.toThrow();
     });
   });
 

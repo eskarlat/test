@@ -573,7 +573,7 @@ describe("chat-builtin-tools", () => {
     it("all handlers return error objects instead of throwing (non-Error exceptions)", async () => {
       // Test with a non-Error throw (string)
       mocks.getProjectRegistry.mockImplementation(() => {
-        throw "string error";  // eslint-disable-line no-throw-literal
+        throw "string error";
       });
       const tool = findTool("get_project");
       const result = await tool.handler({});

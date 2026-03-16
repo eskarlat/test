@@ -72,7 +72,8 @@ export function buildPromptSummary(sessionId: string): string | null {
     try { files = JSON.parse(session?.files_modified ?? "[]") as string[]; } catch { /* ignore */ }
     if (files.length > 0) {
       const shown = files.slice(0, 3).map((f) => f.split("/").pop()).join(", ");
-      parts.push(`edited ${shown}${files.length > 3 ? ` +${files.length - 3} more` : ""}`);
+      const overflow = files.length > 3 ? ` +${files.length - 3} more` : "";
+      parts.push(`edited ${shown}${overflow}`);
     }
 
     if (session && session.error_count > 0) {

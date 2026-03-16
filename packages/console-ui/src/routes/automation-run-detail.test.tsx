@@ -199,7 +199,7 @@ describe("AutomationRunDetailPage", () => {
       activeRun: makeRunDetail({
         worktree: {
           worktreeId: "wt-1",
-          path: "/tmp/worktrees/auto-1", // eslint-disable-line sonarjs/publicly-writable-directories
+          path: "/tmp/worktrees/auto-1",
           branch: "auto/daily-review",
           status: "cleaned_up",
         },

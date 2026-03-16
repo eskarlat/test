@@ -112,7 +112,7 @@ const mockIsCacheStale = vi.mocked(isCacheStale);
 const mockValidateAndInstall = vi.mocked(validateAndInstall);
 const mockUninstallExtension = vi.mocked(uninstallExtension);
 const mockInstallFromLocal = vi.mocked(installFromLocal);
-const mockNotifyExtensionReload = vi.mocked(notifyExtensionReload);
+const _mockNotifyExtensionReload = vi.mocked(notifyExtensionReload);
 const mockNotifyExtensionEnable = vi.mocked(notifyExtensionEnable);
 const mockNotifyExtensionDisable = vi.mocked(notifyExtensionDisable);
 const mockReadServerState = vi.mocked(readServerState);
@@ -348,9 +348,7 @@ describe("marketplace command", () => {
       setupProjectContext();
       mockReadExtensionsJson.mockReturnValue({ extensions: [] });
 
-      await runMarketplace("list");
-
-      // Should not crash, just show info message
+      await expect(runMarketplace("list")).resolves.not.toThrow();
     });
 
     it("exits when not in a project", async () => {

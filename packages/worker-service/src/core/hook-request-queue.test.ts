@@ -81,7 +81,7 @@ import { recordStart as recordSubagentStart } from "./subagent-tracking.js";
 
 function makeRequest(overrides: Partial<HookEnqueueRequest> = {}): HookEnqueueRequest {
   return {
-    batchId: `batch-${Date.now()}-${Math.random()}`,
+    batchId: `batch-${Date.now()}-${crypto.randomUUID()}`,
     feature: "context-inject",
     event: "sessionStart",
     projectId: "proj-1",

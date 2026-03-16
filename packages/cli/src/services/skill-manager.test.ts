@@ -57,8 +57,7 @@ describe("skill-manager", () => {
 
     it("ignores non-existent skill directories", () => {
       vol.mkdirSync("/project/.github/skills", { recursive: true });
-      // Should not throw
-      removeExtensionSkills("/project", ["missing-skill"]);
+      expect(() => removeExtensionSkills("/project", ["missing-skill"])).not.toThrow();
     });
   });
 
