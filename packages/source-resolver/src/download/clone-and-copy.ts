@@ -32,43 +32,7 @@ export function cloneAndCopy(opts: {
   const tempDir = mkdtempSync(join(tmpdir(), "renre-kit-dl-"));
 
   try {
-    const isSha = ref ? /^[0-9a-f]{7,40}$/i.test(ref) : false;
-
-    // Build git clone args
-    // SHA refs cannot use --branch; clone first then checkout
-    const args = ["clone"];
-    if (!isSha) args.push("--depth=1");
-    if (ref && ref !== "latest" && !isSha) {
-      args.push("--branch", ref);
-    }
-    args.push(cloneUrl, tempDir);
-
-    // eslint-disable-next-line sonarjs/no-os-command-from-path
-    const result = spawnSync("git", args, {
-      stdio: "pipe",
-      encoding: "utf8",
-      timeout: 120_000,
-    });
-
-    if (result.status !== 0) {
-      const stderr = result.stderr?.trim() ?? "";
-      throw new Error(`git clone failed (exit ${result.status ?? "null"}): ${stderr}`);
-    }
-
-    // For SHA refs, checkout the specific commit after cloning
-    if (isSha && ref) {
-      // eslint-disable-next-line sonarjs/no-os-command-from-path
-      const checkout = spawnSync("git", ["checkout", ref], {
-        cwd: tempDir,
-        stdio: "pipe",
-        encoding: "utf8",
-        timeout: 30_000,
-      });
-      if (checkout.status !== 0) {
-        const stderr = checkout.stderr?.trim() ?? "";
-        throw new Error(`git checkout ${ref} failed (exit ${checkout.status ?? "null"}): ${stderr}`);
-      }
-    }
+    gitCloneAtRef(cloneUrl, ref, tempDir);
 
     // Determine source directory (full clone or subpath)
     const sourceDir = subpath ? join(tempDir, subpath) : tempDir;
@@ -105,6 +69,42 @@ export function cloneAndCopy(opts: {
     } catch {
       // Non-fatal — temp cleanup failure
     }
+  }
+}
+
+function isShaRef(ref: string | undefined): boolean {
+  return ref ? /^[0-9a-f]{7,40}$/i.test(ref) : false;
+}
+
+function runGit(args: string[], opts?: { cwd?: string; timeout?: number }): void {
+  // eslint-disable-next-line sonarjs/no-os-command-from-path
+  const result = spawnSync("git", args, {
+    cwd: opts?.cwd,
+    stdio: "pipe",
+    encoding: "utf8",
+    timeout: opts?.timeout ?? 120_000,
+  });
+  if (result.status !== 0) {
+    const stderr = result.stderr?.trim() ?? "";
+    throw new Error(`git ${args[0]} failed (exit ${result.status ?? "null"}): ${stderr}`);
+  }
+}
+
+/**
+ * Clone a git repo, optionally at a specific ref (branch, tag, or SHA).
+ * SHA refs require a full clone followed by checkout since --branch doesn't accept them.
+ */
+function gitCloneAtRef(cloneUrl: string, ref: string | undefined, tempDir: string): void {
+  const sha = isShaRef(ref);
+  const args = ["clone"];
+  if (!sha) args.push("--depth=1");
+  if (ref && ref !== "latest" && !sha) args.push("--branch", ref);
+  args.push(cloneUrl, tempDir);
+
+  runGit(args);
+
+  if (sha && ref) {
+    runGit(["checkout", ref], { cwd: tempDir, timeout: 30_000 });
   }
 }
 

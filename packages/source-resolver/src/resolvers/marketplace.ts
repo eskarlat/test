@@ -165,9 +165,8 @@ export class MarketplaceResolver implements SourceResolver {
     // Git-based marketplace — clone to temp and read
     const tempDir = mkdtempSync(join(tmpdir(), "renre-kit-mp-"));
     try {
-      // eslint-disable-next-line sonarjs/no-os-command-from-path
       const result = spawnSync(
-        "git",
+        "git", // eslint-disable-line sonarjs/no-os-command-from-path
         ["clone", "--depth=1", url, tempDir],
         { stdio: "pipe", encoding: "utf8", timeout: 60_000 },
       );
