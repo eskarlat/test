@@ -70,8 +70,8 @@ export function cloneAndCopy(opts: {
       uri: sourceUri,
       downloadedAt: new Date().toISOString(),
       strategy: "git-clone",
-      commitSha,
     };
+    if (commitSha !== undefined) metadata.commitSha = commitSha;
     writeFileSync(
       join(destDir, "_source.json"),
       JSON.stringify(metadata, null, 2) + "\n",

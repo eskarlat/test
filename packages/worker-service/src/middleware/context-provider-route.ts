@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { getMountedInfo, getRouter } from "../core/extension-registry.js";
-import { logger } from "../core/logger.js";
 import { getRegistry as getProjectRegistry } from "../routes/projects.js";
+import { delegateToExtensionRouter } from "./delegate-to-extension.js";
 
 /**
  * POST /api/{projectId}/{extensionName}/__context — Context Provider route (ADR-036)
@@ -52,36 +52,15 @@ export function contextProviderRouteMiddleware(
     return;
   }
 
-  // Delegate to the extension router at /__context
   const extRouter = getRouter(projectId, extensionName);
   if (!extRouter) {
     res.status(404).json({ error: `Extension ${extensionName} router not available` });
     return;
   }
 
-  // Rewrite URL to /__context and delegate to extension router
-  const originalUrl = req.url;
-  req.url = "/__context";
-
-  try {
-    extRouter(req, res, (err?: unknown) => {
-      req.url = originalUrl;
-      if (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        logger.error(`ext:${extensionName}`, `Context provider error: ${msg}`);
-        if (!res.headersSent) {
-          res.status(500).json({ error: "Context provider error" });
-        }
-      } else {
-        next();
-      }
-    });
-  } catch (err) {
-    req.url = originalUrl;
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.error(`ext:${extensionName}`, `Context provider uncaught error: ${msg}`);
-    if (!res.headersSent) {
-      res.status(500).json({ error: "Context provider error" });
-    }
-  }
+  delegateToExtensionRouter(req, res, next, extRouter, {
+    extensionName,
+    rewritePath: "/__context",
+    errorLabel: "Context provider error",
+  });
 }

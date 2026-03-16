@@ -12,17 +12,12 @@ export class GitResolver implements SourceResolver {
 
   async resolve(parsed: ParsedSource): Promise<ResolvedExtension> {
     const cloneUrl = this.buildCloneUrl(parsed);
-    let cloneRef = parsed.ref;
+    let cloneRef: string | undefined = parsed.ref;
 
     // Resolve "latest" to a concrete tag
     if (cloneRef === "latest") {
       const tag = resolveLatestTag(cloneUrl);
-      if (tag) {
-        cloneRef = tag;
-      } else {
-        // No semver tags found — clone HEAD
-        cloneRef = undefined;
-      }
+      cloneRef = tag ?? undefined;
     }
 
     // Derive version from ref (strip leading 'v')
@@ -30,14 +25,15 @@ export class GitResolver implements SourceResolver {
       ? (cloneRef.startsWith("v") ? cloneRef.slice(1) : cloneRef)
       : "0.0.0-HEAD";
 
-    return {
+    const result: ResolvedExtension = {
       name: parsed.name,
       version,
       source: parsed,
       cloneUrl,
-      cloneRef,
-      subpath: parsed.subpath,
     };
+    if (cloneRef !== undefined) result.cloneRef = cloneRef;
+    if (parsed.subpath !== undefined) result.subpath = parsed.subpath;
+    return result;
   }
 
   async download(resolved: ResolvedExtension, destDir: string): Promise<string> {
@@ -46,13 +42,14 @@ export class GitResolver implements SourceResolver {
       return destDir;
     }
 
-    return cloneAndCopy({
+    const opts: { cloneUrl: string; destDir: string; sourceUri: string; ref?: string; subpath?: string } = {
       cloneUrl: resolved.cloneUrl,
-      ref: resolved.cloneRef,
-      subpath: resolved.subpath,
       destDir,
       sourceUri: toSourceUri(resolved.source),
-    });
+    };
+    if (resolved.cloneRef !== undefined) opts.ref = resolved.cloneRef;
+    if (resolved.subpath !== undefined) opts.subpath = resolved.subpath;
+    return cloneAndCopy(opts);
   }
 
   private buildCloneUrl(parsed: ParsedSource): string {

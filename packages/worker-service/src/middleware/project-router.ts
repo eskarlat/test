@@ -1,8 +1,8 @@
 import type { Request, Response, NextFunction } from "express";
 import { getRouter } from "../core/extension-registry.js";
 import { circuitBreaker } from "../core/extension-circuit-breaker.js";
-import { logger } from "../core/logger.js";
 import { extensionTimeout } from "./extension-timeout.js";
+import { delegateToExtensionRouter } from "./delegate-to-extension.js";
 import { getRegistry as getProjectRegistry } from "../routes/projects.js";
 
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -69,40 +69,17 @@ export function projectRouterMiddleware(
     return;
   }
 
-  // Strip the project/extension prefix from the URL for the sub-router
   const subPath = match[3] ?? "/";
-  const originalUrl = req.url;
-  req.url = subPath;
 
   // Apply timeout then delegate to extension router
   const timeoutMiddleware = extensionTimeout(REQUEST_TIMEOUT_MS);
   timeoutMiddleware(req, res, () => {
-    try {
-      extRouter(req, res, (err?: unknown) => {
-        req.url = originalUrl;
-        if (err) {
-          circuitBreaker.recordError(projectId, extensionName);
-          const msg = err instanceof Error ? err.message : String(err);
-          logger.error(
-            `ext:${extensionName}`,
-            `Unhandled error: ${msg}`,
-          );
-          if (!res.headersSent) {
-            res.status(500).json({ error: "Internal extension error" });
-          }
-        } else {
-          circuitBreaker.recordSuccess(projectId, extensionName);
-          next();
-        }
-      });
-    } catch (err) {
-      req.url = originalUrl;
-      circuitBreaker.recordError(projectId, extensionName);
-      const msg = err instanceof Error ? err.message : String(err);
-      logger.error(`ext:${extensionName}`, `Uncaught error: ${msg}`);
-      if (!res.headersSent) {
-        res.status(500).json({ error: "Internal extension error" });
-      }
-    }
+    delegateToExtensionRouter(req, res, next, extRouter, {
+      extensionName,
+      rewritePath: subPath,
+      errorLabel: "Internal extension error",
+      onError: () => circuitBreaker.recordError(projectId, extensionName),
+      onSuccess: () => circuitBreaker.recordSuccess(projectId, extensionName),
+    });
   });
 }

@@ -38,9 +38,9 @@ function splitRef(input: string): [body: string, ref: string] {
  *   local+link:/absolute/path
  *
  * Shorthand:
- *   jira-plugin             → marketplace:*/jira-plugin@latest
- *   official/jira-plugin    → marketplace:official/jira-plugin@latest
- *   ./path or /path         → local:<absolute-path>
+ *   jira-plugin             → marketplace:asterisk/jira-plugin (latest)
+ *   official/jira-plugin    → marketplace:official/jira-plugin (latest)
+ *   ./path or /path         → local:absolute-path
  */
 export function parseSourceUri(input: string): ParsedSource {
   const trimmed = input.trim();
@@ -105,7 +105,9 @@ function parseGitHubBody(body: string): ParsedSource {
   const subpath = segments.length > 2 ? segments.slice(2).join("/") : undefined;
   const name = subpath ? segments[segments.length - 1]! : repo;
 
-  return { scheme: "github", owner, repo, subpath, name, ref };
+  const result: ParsedSource = { scheme: "github", owner, repo, name, ref };
+  if (subpath !== undefined) result.subpath = subpath;
+  return result;
 }
 
 function parseGitBody(body: string): ParsedSource {
