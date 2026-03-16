@@ -48,15 +48,47 @@ const TOOL_INTENTS: Record<string, IntentFn> = {
   list_directory: (args) => `List ${shortenPath(String(args.path ?? ""))}`,
 };
 
+// ---------------------------------------------------------------------------
+// Extension toolDisplay hint registration (ADR-052 §1.6)
+// ---------------------------------------------------------------------------
+
+const extensionIntentRegistry = new Map<string, IntentFn>();
+
+/**
+ * Register extension tool display hints at extension mount time.
+ * `intent` is a Mustache-style template: "Deploy to {{environment}}"
+ */
+export function registerExtensionToolIntent(toolName: string, intentTemplate: string): void {
+  extensionIntentRegistry.set(toolName, (args) => {
+    return intentTemplate.replace(/\{\{(\w+)\}\}/g, (_match, key: string) => {
+      const val = args[key];
+      return val != null ? truncate(String(val), 30) : key;
+    });
+  });
+}
+
+/**
+ * Clear all registered extension tool intents (useful for testing or extension unload).
+ */
+export function clearExtensionToolIntents(): void {
+  extensionIntentRegistry.clear();
+}
+
 /**
  * Generate a human-readable intent string for a tool call.
+ * Resolution order: built-in → extension manifest → fallback (ADR-052 §1.6).
  * Example: `getToolIntent("Read", { file_path: "src/index.ts" })` → `"Read .../index.ts"`
  */
 export function getToolIntent(toolName: string, args: Record<string, unknown>): string {
-  const fn = TOOL_INTENTS[toolName];
-  if (fn) return fn(args);
+  // 1. Built-in
+  const builtIn = TOOL_INTENTS[toolName];
+  if (builtIn) return builtIn(args);
 
-  // Fallback: humanize tool name + first argument value
+  // 2. Extension manifest
+  const extFn = extensionIntentRegistry.get(toolName);
+  if (extFn) return extFn(args);
+
+  // 3. Fallback: humanize tool name + first argument value
   const firstArg = Object.values(args)[0];
   const suffix = firstArg ? ` — ${truncate(String(firstArg), 40)}` : "";
   return `${humanize(toolName)}${suffix}`;

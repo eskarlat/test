@@ -81,10 +81,42 @@ const FALLBACK_CONFIG: ToolDisplayConfig = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Extension display config registration (ADR-052 §1.6)
+// ---------------------------------------------------------------------------
+
+const extensionDisplayConfigs = new Map<string, ToolDisplayConfig>();
+
 /**
- * Get the display config for a tool. Falls back to showing the first 2 args
- * and truncating the result to the first line for unknown tools.
+ * Register display config for an extension tool at mount time.
+ * `keyArgs` specifies which argument keys to surface in standard mode.
+ * `resultSummaryMode` — "short" uses first line of result content.
+ */
+export function registerExtensionToolDisplayConfig(
+  toolName: string,
+  config: { keyArgs?: string[]; resultSummary?: string },
+): void {
+  extensionDisplayConfigs.set(toolName, {
+    keyArgs: config.keyArgs ?? [],
+    resultSummary: config.resultSummary === "short"
+      ? (r) => { const first = r.content.split("\n")[0] ?? ""; return truncate(first, 80); }
+      : FALLBACK_CONFIG.resultSummary,
+  });
+}
+
+/**
+ * Clear all registered extension display configs (useful for testing or extension unload).
+ */
+export function clearExtensionToolDisplayConfigs(): void {
+  extensionDisplayConfigs.clear();
+}
+
+/**
+ * Get the display config for a tool. Resolution order:
+ * built-in → extension manifest → fallback (ADR-052 §1.6).
  */
 export function getToolDisplayConfig(toolName: string): ToolDisplayConfig {
-  return TOOL_DISPLAY_CONFIGS[toolName] ?? FALLBACK_CONFIG;
+  return TOOL_DISPLAY_CONFIGS[toolName]
+    ?? extensionDisplayConfigs.get(toolName)
+    ?? FALLBACK_CONFIG;
 }

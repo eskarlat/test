@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Settings, AlertCircle, RefreshCw } from "lucide-react";
 import { Skeleton } from "../components/ui/Skeleton";
 import { apiGet, BASE_URL } from "../api/client";
+import { useChatPreferencesStore, type ToolDisplayMode } from "../stores/chat-preferences-store";
+import { ToolDisplayModeSelector } from "../components/chat/ToolDisplayModeSelector";
 
 interface HealthData {
   status: string;
@@ -109,6 +111,22 @@ function MarketplaceList({ marketplaces }: { marketplaces: MarketplaceEntry[] | 
   );
 }
 
+function ChatPreferencesSection() {
+  return (
+    <div className="rounded-lg border border-border bg-card divide-y divide-border">
+      <div className="flex items-center justify-between px-4 py-3">
+        <div>
+          <p className="text-sm text-foreground font-medium">Tool Display Mode</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Controls how tool executions appear in chat messages.
+          </p>
+        </div>
+        <ToolDisplayModeSelector />
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const [config, setConfig] = useState<WorkerConfig>({});
   const [health, setHealth] = useState<HealthData | null>(null);
@@ -201,6 +219,14 @@ export default function SettingsPage() {
           <code className="font-mono bg-muted px-1 rounded">~/.renre-kit/config.json</code>{" "}
           directly to make changes.
         </p>
+      </section>
+
+      {/* Chat Preferences */}
+      <section aria-labelledby="chat-prefs-heading">
+        <h2 id="chat-prefs-heading" className="text-sm font-semibold text-foreground mb-3">
+          Chat
+        </h2>
+        <ChatPreferencesSection />
       </section>
 
       {/* Registered Marketplaces */}

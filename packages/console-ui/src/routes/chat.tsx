@@ -1,6 +1,7 @@
-import { useEffect, useCallback, useMemo, useRef } from "react";
+import { useEffect, useCallback, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useChatStore, type ChatState, onMessageDelta, onReasoningDelta, onTurnStart, onVisibilityChange } from "../stores/chat-store";
+import { useChatLayoutStore, countLeaves, collectPaneIds, type SplitDirection } from "../stores/chat-layout-store";
 import { uuid } from "../lib/utils";
 import { useSocketStore } from "../api/socket";
 import { ChatSessionList } from "../components/chat/ChatSessionList";
@@ -13,6 +14,8 @@ import { ChatContextBar } from "../components/chat/ChatContextBar";
 import { ChatPermissionBanner } from "../components/chat/ChatPermissionBanner";
 import { ChatInputDialog } from "../components/chat/ChatInputDialog";
 import { ChatElicitationDialog } from "../components/chat/ChatElicitationDialog";
+import { ChatLayoutRenderer } from "../components/chat/ChatLayoutRenderer";
+import { SplitMenu } from "../components/chat/SplitMenu";
 import type { ChatMessage, ContentBlock } from "../types/chat";
 
 // ---------------------------------------------------------------------------
@@ -63,17 +66,14 @@ function replaceCompactionBlock(
 }
 
 // ---------------------------------------------------------------------------
-// Socket.IO chat event binding
+// Socket.IO chat event binding (legacy single-session — used when layout is
+// single-pane for backward compat with existing behavior)
 // ---------------------------------------------------------------------------
 
-// Tracks sessions that have already had their pending initial message sent.
-// Prevents duplicate sends when React Strict Mode double-fires effects.
 const sentPendingSessions = new Set<string>();
 
 function useChatSocket(sessionId: string | null): void {
   const socket = useSocketStore((s) => s.socket);
-  // Track whether THIS effect instance initiated a send, so the cleanup
-  // avoids clearing streaming state that belongs to an active generation.
   const didSendRef = useRef(false);
 
   useEffect(() => {
@@ -83,10 +83,6 @@ function useChatSocket(sessionId: string | null): void {
     socket.emit("chat:join", sessionId);
 
     function handleTurnStart(): void {
-      // The bridge suppresses duplicate turn-starts server-side via
-      // suppressNextTurnStart. If we still receive one while streaming,
-      // it's a legitimate new turn (e.g., tool-use → re-prompt).
-      // Finalize the previous turn's content before starting a new one.
       if (useChatStore.getState().isStreaming && sessionId) {
         useChatStore.getState().finalizeAssistantMessage(sessionId);
       }
@@ -105,8 +101,6 @@ function useChatSocket(sessionId: string | null): void {
     }
 
     function ensureStreamingState(): void {
-      // Self-healing: if a delta arrives but isStreaming is false (e.g.,
-      // turn-start was missed due to Strict Mode cleanup/remount), recover.
       if (!useChatStore.getState().isStreaming) {
         onTurnStart();
         if (sessionId) {
@@ -138,9 +132,6 @@ function useChatSocket(sessionId: string | null): void {
       }
     }
 
-    // Stash the full content from assistant.message so turn-end can use it
-    // as a fallback. We do NOT finalize here — finalizing immediately would
-    // prevent streaming deltas from ever rendering (the RAF hasn't flushed yet).
     let messageFallback: string | undefined;
 
     function handleMessage(data: { content: string }): void {
@@ -201,7 +192,6 @@ function useChatSocket(sessionId: string | null): void {
       useChatStore.setState((s) => replaceCompactionBlock(s, sessionId, block));
     }
 
-    // Tool events — inject ToolExecutionBlock into last assistant message
     function handleToolStart(data: { toolCallId: string; roundId: string; toolName: string; toolArgs?: Record<string, unknown> }): void {
       if (!sessionId) return;
       const block: ContentBlock = {
@@ -246,7 +236,6 @@ function useChatSocket(sessionId: string | null): void {
           if (blockIdx < 0) return msg;
           const oldBlock = msg.blocks[blockIdx] as import("../types/chat").ToolExecutionBlock;
           const resultObj = data.result ?? {};
-          // Extract content string: prefer .content if it's a string, else JSON-serialize
           const resultContent = typeof resultObj === "object" && resultObj !== null && "content" in resultObj && typeof (resultObj as Record<string, unknown>).content === "string"
             ? (resultObj as Record<string, unknown>).content as string
             : JSON.stringify(resultObj, null, 2);
@@ -269,7 +258,6 @@ function useChatSocket(sessionId: string | null): void {
       });
     }
 
-    // Subagent events — inject SubagentBlock into last assistant message
     function handleSubagentStart(data: { toolCallId: string; agentName: string; agentDisplayName?: string }): void {
       if (!sessionId) return;
       const block: ContentBlock = {
@@ -325,7 +313,6 @@ function useChatSocket(sessionId: string | null): void {
       });
     }
 
-    // Permission/input/elicitation — set pending state (Phase 6 renders dialogs)
     function handlePermission(data: { requestId: string; title: string; message: string; permissionKind: string; diff?: string }): void {
       if (useChatStore.getState().autopilot) {
         useChatStore.getState().respondToPermission(data.requestId, true);
@@ -342,7 +329,6 @@ function useChatSocket(sessionId: string | null): void {
       useChatStore.setState({ pendingElicitation: data });
     }
 
-    // Bind events
     socket.on("turn-start", handleTurnStart);
     socket.on("message-delta", handleMessageDelta);
     socket.on("reasoning-delta", handleReasoningDelta);
@@ -362,11 +348,8 @@ function useChatSocket(sessionId: string | null): void {
     socket.on("input-request", handleInput);
     socket.on("elicitation-request", handleElicitation);
 
-    // Visibility change listener for buffer flushing
     document.addEventListener("visibilitychange", onVisibilityChange);
 
-    // Send pending initial message if present (from new session creation).
-    // Use sentPendingSessions to deduplicate across Strict Mode double-effects.
     const pending = useChatStore.getState().pendingInitialMessage;
     if (pending && !sentPendingSessions.has(sessionId)) {
       sentPendingSessions.add(sessionId);
@@ -396,8 +379,6 @@ function useChatSocket(sessionId: string | null): void {
       socket.off("input-request", handleInput);
       socket.off("elicitation-request", handleElicitation);
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      // Don't clear streaming state if we just sent a message — Strict Mode
-      // cleanup would wipe the streaming state that the server is about to fill.
       if (!didSendRef.current) {
         useChatStore.getState().clearStreamingState();
       }
@@ -406,7 +387,33 @@ function useChatSocket(sessionId: string | null): void {
 }
 
 // ---------------------------------------------------------------------------
-// Keyboard shortcuts — scoped to the chat page
+// Responsive breakpoints hook (ADR-052 §2.9)
+// ---------------------------------------------------------------------------
+
+function useMaxPanes(): number {
+  const [maxPanes, setMaxPanes] = useState(() => {
+    if (typeof window === "undefined") return 4;
+    if (window.innerWidth < 768) return 1;
+    if (window.innerWidth <= 1200) return 2;
+    return 4;
+  });
+
+  useEffect(() => {
+    function handleResize() {
+      const w = window.innerWidth;
+      if (w < 768) setMaxPanes(1);
+      else if (w <= 1200) setMaxPanes(2);
+      else setMaxPanes(4);
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  return maxPanes;
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard shortcuts — scoped to the chat page (ADR-052 §2.8 + legacy)
 // ---------------------------------------------------------------------------
 
 interface ShortcutEntry {
@@ -416,10 +423,20 @@ interface ShortcutEntry {
 
 function isInputTarget(e: KeyboardEvent): boolean {
   const tag = (e.target as HTMLElement).tagName;
-  return tag === "INPUT" || tag === "TEXTAREA";
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
 }
 
-function useChatKeyboardShortcuts(projectId: string | undefined): void {
+function useChatKeyboardShortcuts(
+  projectId: string | undefined,
+  splitActions: {
+    splitRight: () => void;
+    splitDown: () => void;
+    closePane: () => void;
+    focusPaneByIndex: (index: number) => void;
+    cycleFocus: (delta: number) => void;
+    paneCount: number;
+  },
+): void {
   const navigate = useNavigate();
   const isStreaming = useChatStore(selectIsStreaming);
 
@@ -490,7 +507,54 @@ function useChatKeyboardShortcuts(projectId: string | undefined): void {
         reviseLastUserMessage();
       },
     },
-  ], [isStreaming, projectId, navigate, copyLastAssistantMessage, reviseLastUserMessage]);
+    // Ctrl+\ — Split right (ADR-052 §2.8)
+    {
+      match: (e) => (e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "\\",
+      handler: (e) => {
+        e.preventDefault();
+        splitActions.splitRight();
+      },
+    },
+    // Ctrl+Shift+\ — Split down (ADR-052 §2.8)
+    {
+      match: (e) => (e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "\\",
+      handler: (e) => {
+        e.preventDefault();
+        splitActions.splitDown();
+      },
+    },
+    // Ctrl+Shift+W — Close focused pane (ADR-052 §2.8)
+    {
+      match: (e) => (e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "W" && splitActions.paneCount > 1,
+      handler: (e) => {
+        e.preventDefault();
+        splitActions.closePane();
+      },
+    },
+    // Alt+1/2/3/4 — Focus pane by index (ADR-052 §2.8)
+    ...[1, 2, 3, 4].map((n) => ({
+      match: (e: KeyboardEvent) => e.altKey && e.key === String(n) && !isInputTarget(e),
+      handler: (e: KeyboardEvent) => {
+        e.preventDefault();
+        splitActions.focusPaneByIndex(n - 1);
+      },
+    })),
+    // Alt+[ / Alt+] — Cycle focus (ADR-052 §2.8)
+    {
+      match: (e) => e.altKey && e.key === "[" && !isInputTarget(e),
+      handler: (e) => {
+        e.preventDefault();
+        splitActions.cycleFocus(-1);
+      },
+    },
+    {
+      match: (e) => e.altKey && e.key === "]" && !isInputTarget(e),
+      handler: (e) => {
+        e.preventDefault();
+        splitActions.cycleFocus(1);
+      },
+    },
+  ], [isStreaming, projectId, navigate, copyLastAssistantMessage, reviseLastUserMessage, splitActions]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent): void {
@@ -508,7 +572,7 @@ function useChatKeyboardShortcuts(projectId: string | undefined): void {
 }
 
 // ---------------------------------------------------------------------------
-// Chat page — two-panel layout
+// Chat page — two-panel layout with split view support
 // ---------------------------------------------------------------------------
 
 export default function ChatPage() {
@@ -527,7 +591,25 @@ export default function ChatPage() {
   const setActiveSession = useChatStore(selectSetActiveSession);
   const resumeSession = useChatStore(selectResumeSession);
 
-  // Fetch bridge status — retry while not ready (bridge initializes lazily)
+  // Layout store (per-project)
+  const layoutStore = useChatLayoutStore(projectId ?? "default");
+  const layout = layoutStore((s) => s.layout);
+  const panes = layoutStore((s) => s.panes);
+  const focusedPaneId = layoutStore((s) => s.focusedPaneId);
+  const splitPane = layoutStore((s) => s.splitPane);
+  const closePane = layoutStore((s) => s.closePane);
+  const setSessionForPane = layoutStore((s) => s.setSessionForPane);
+  const setFocusedPane = layoutStore((s) => s.setFocusedPane);
+  const setSplitRatio = layoutStore((s) => s.setSplitRatio);
+  const resetLayout = layoutStore((s) => s.resetLayout);
+
+  const maxPanes = useMaxPanes();
+  const paneCount = countLeaves(layout);
+  const paneIds = useMemo(() => collectPaneIds(layout), [layout]);
+  const isMultiPane = paneCount > 1;
+  const canSplit = paneCount < maxPanes;
+
+  // Fetch bridge status — retry while not ready
   useEffect(() => {
     checkBridgeStatus();
   }, [checkBridgeStatus]);
@@ -550,65 +632,132 @@ export default function ChatPage() {
     }
   }, [projectId, bridgeStatus, fetchSessions]);
 
-  // Sync route param to store and load messages for the session
+  // Sync route param to store and load messages for the session (single-pane mode)
   useEffect(() => {
-    setActiveSession(sessionId ?? null);
-    if (projectId && sessionId && bridgeStatus === "ready") {
-      resumeSession(projectId, sessionId);
+    if (!isMultiPane) {
+      setActiveSession(sessionId ?? null);
+      if (projectId && sessionId && bridgeStatus === "ready") {
+        resumeSession(projectId, sessionId);
+      }
     }
-  }, [sessionId, projectId, bridgeStatus, setActiveSession, resumeSession]);
+  }, [sessionId, projectId, bridgeStatus, setActiveSession, resumeSession, isMultiPane]);
 
-  // Bind socket events for active session
-  useChatSocket(sessionId ?? null);
+  // When route has sessionId and layout is single-pane, also assign to pane-1
+  useEffect(() => {
+    if (!isMultiPane && sessionId && panes["pane-1"]?.sessionId !== sessionId) {
+      setSessionForPane("pane-1", sessionId);
+    }
+  }, [isMultiPane, sessionId, panes, setSessionForPane]);
+
+  // Bind socket events for active session (single-pane legacy)
+  useChatSocket(isMultiPane ? null : (sessionId ?? null));
+
+  // Split action callbacks
+  const splitActions = useMemo(() => ({
+    splitRight: () => { if (canSplit) splitPane(focusedPaneId, "vertical"); },
+    splitDown: () => { if (canSplit) splitPane(focusedPaneId, "horizontal"); },
+    closePane: () => closePane(focusedPaneId),
+    focusPaneByIndex: (index: number) => {
+      if (index < paneIds.length) setFocusedPane(paneIds[index]!);
+    },
+    cycleFocus: (delta: number) => {
+      const idx = paneIds.indexOf(focusedPaneId);
+      const next = (idx + delta + paneIds.length) % paneIds.length;
+      setFocusedPane(paneIds[next]!);
+    },
+    paneCount,
+  }), [canSplit, focusedPaneId, paneIds, paneCount, splitPane, closePane, setFocusedPane]);
 
   // Register keyboard shortcuts
-  useChatKeyboardShortcuts(projectId);
+  useChatKeyboardShortcuts(projectId, splitActions);
 
   const sessionsLoading = bridgeStatus === "ready" && !sessionsFetched;
   const showBridgeNotReady = bridgeStatus !== "ready";
 
+  // Handle session change from a pane
+  const handlePaneSessionChange = useCallback((paneId: string, sid: string) => {
+    setSessionForPane(paneId, sid);
+    // Also update route if single-pane
+    if (!isMultiPane && projectId) {
+      setActiveSession(sid);
+      navigate(`/${projectId}/chat/${sid}`);
+    }
+  }, [isMultiPane, projectId, setSessionForPane, setActiveSession, navigate]);
+
+  const handleSplitAction = useCallback((direction: SplitDirection) => {
+    if (canSplit) splitPane(focusedPaneId, direction);
+  }, [canSplit, splitPane, focusedPaneId]);
+
   return (
     <div className="flex h-full -m-4 md:-m-6">
       {/* Session list panel — hidden on mobile when a session is active */}
-      <div className={`${sessionId ? "hidden md:block" : "w-full md:w-[280px]"} md:w-[280px] flex-shrink-0 border-r border-border bg-background overflow-hidden`}>
+      <div className={`${sessionId || isMultiPane ? "hidden md:block" : "w-full md:w-[280px]"} md:w-[280px] flex-shrink-0 border-r border-border bg-background overflow-hidden`}>
         <ChatSessionList loading={sessionsLoading && !showBridgeNotReady} />
       </div>
 
       {/* Chat area */}
-      <div className={`flex-1 flex flex-col min-w-0 ${sessionId ? "" : "hidden md:flex"}`}>
-        {sessionId && bridgeStatus === "ready" ? (
-          <>
-            <div className="flex items-center gap-2 px-2 md:px-4 py-2 border-b border-border overflow-x-auto">
-              {/* Mobile back button */}
-              <button
-                onClick={() => navigate(`/${projectId}/chat`)}
-                className="md:hidden flex-shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                aria-label="Back to sessions"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-              </button>
-              <ChatModelSelector />
-              <ToolDisplayModeSelector />
+      <div className={`flex-1 flex flex-col min-w-0 ${sessionId || isMultiPane ? "" : "hidden md:flex"}`}>
+        {/* Header bar */}
+        <div className="flex items-center gap-2 px-2 md:px-4 py-2 border-b border-border overflow-x-auto">
+          {/* Mobile back button */}
+          <button
+            onClick={() => navigate(`/${projectId}/chat`)}
+            className="md:hidden flex-shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            aria-label="Back to sessions"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <ChatModelSelector />
+          <ToolDisplayModeSelector />
+          <span className="flex-1" />
+          <SplitMenu
+            canSplit={canSplit}
+            onSplit={handleSplitAction}
+            onReset={resetLayout}
+            paneCount={paneCount}
+          />
+        </div>
+
+        {/* Layout area */}
+        {bridgeStatus === "ready" ? (
+          isMultiPane ? (
+            <div className="flex-1 min-h-0">
+              <ChatLayoutRenderer
+                node={layout}
+                panes={panes}
+                focusedPaneId={focusedPaneId}
+                path={[]}
+                onSplitRatio={setSplitRatio}
+                onFocusPane={setFocusedPane}
+                onClosePane={closePane}
+                onSessionChange={handlePaneSessionChange}
+                canClose={paneCount > 1}
+              />
             </div>
-            <ChatContextBar />
-            <ChatMessageList sessionId={sessionId} />
-            {pendingPermission && (
-              <div className="px-2 md:px-4 pb-2">
-                <ChatPermissionBanner key={pendingPermission.requestId} request={pendingPermission} />
-              </div>
-            )}
-            {pendingInput && (
-              <div className="px-2 md:px-4 pb-2">
-                <ChatInputDialog request={pendingInput} />
-              </div>
-            )}
-            {pendingElicitation && (
-              <div className="px-2 md:px-4 pb-2">
-                <ChatElicitationDialog request={pendingElicitation} />
-              </div>
-            )}
-            <ChatInput />
-          </>
+          ) : sessionId ? (
+            <>
+              <ChatContextBar />
+              <ChatMessageList sessionId={sessionId} />
+              {pendingPermission && (
+                <div className="px-2 md:px-4 pb-2">
+                  <ChatPermissionBanner key={pendingPermission.requestId} request={pendingPermission} />
+                </div>
+              )}
+              {pendingInput && (
+                <div className="px-2 md:px-4 pb-2">
+                  <ChatInputDialog request={pendingInput} />
+                </div>
+              )}
+              {pendingElicitation && (
+                <div className="px-2 md:px-4 pb-2">
+                  <ChatElicitationDialog request={pendingElicitation} />
+                </div>
+              )}
+              <ChatInput />
+            </>
+          ) : (
+            <ChatEmptyState sessionError={sessionError ?? undefined} />
+          )
         ) : (
           <ChatEmptyState sessionError={sessionError ?? undefined} />
         )}
