@@ -4,7 +4,7 @@ import { getToolIntent, humanize, truncate, shortenPath } from "./tool-intent";
 describe("tool-intent", () => {
   describe("getToolIntent", () => {
     it("returns intent for Read tool", () => {
-      expect(getToolIntent("Read", { file_path: "src/index.ts" })).toBe("Read .../index.ts");
+      expect(getToolIntent("Read", { file_path: "src/index.ts" })).toBe("Read src/index.ts");
     });
 
     it("returns intent for Bash tool", () => {
@@ -20,25 +20,25 @@ describe("tool-intent", () => {
     });
 
     it("returns intent for lowercase variants", () => {
-      expect(getToolIntent("read_file", { file_path: "a/b/c.ts" })).toBe("Read .../c.ts");
+      expect(getToolIntent("read_file", { file_path: "a/b/c.ts" })).toBe("Read a/b/c.ts");
     });
 
     it("falls back to humanized tool name for unknown tools", () => {
-      expect(getToolIntent("createPullRequest", {})).toBe("Create pull request");
+      expect(getToolIntent("createPullRequest", {})).toBe("Create Pull Request");
     });
 
     it("includes first arg in fallback", () => {
-      expect(getToolIntent("customTool", { target: "deploy" })).toBe("Custom tool — deploy");
+      expect(getToolIntent("customTool", { target: "deploy" })).toBe("Custom Tool — deploy");
     });
 
     it("handles extension-namespaced tools in fallback", () => {
-      expect(getToolIntent("myext__doStuff", {})).toBe("Do stuff");
+      expect(getToolIntent("myext__doStuff", {})).toBe("Do Stuff");
     });
   });
 
   describe("humanize", () => {
     it("converts camelCase", () => {
-      expect(humanize("createPullRequest")).toBe("Create pull request");
+      expect(humanize("createPullRequest")).toBe("Create Pull Request");
     });
 
     it("converts snake_case", () => {
@@ -46,7 +46,7 @@ describe("tool-intent", () => {
     });
 
     it("strips extension namespace", () => {
-      expect(humanize("myext__doStuff")).toBe("Do stuff");
+      expect(humanize("myext__doStuff")).toBe("Do Stuff");
     });
   });
 
@@ -56,7 +56,7 @@ describe("tool-intent", () => {
     });
 
     it("truncates long strings with ellipsis", () => {
-      expect(truncate("a very long string indeed", 10)).toBe("a very...");
+      expect(truncate("a very long string indeed", 10)).toBe("a very ...");
     });
   });
 
