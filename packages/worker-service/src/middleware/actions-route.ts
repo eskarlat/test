@@ -1,5 +1,8 @@
 import type { Request, Response, NextFunction } from "express";
 import { getMountedInfo } from "../core/extension-registry.js";
+import { parseExtensionRoute } from "./delegate-to-extension.js";
+
+const ACTIONS_ROUTE_RE = /^\/api\/([^/]+)\/([^/]+)\/__actions$/;
 
 export function actionsRouteMiddleware(
   req: Request,
@@ -12,19 +15,13 @@ export function actionsRouteMiddleware(
     return;
   }
 
-  const match = /^\/api\/([^/]+)\/([^/]+)\/__actions$/.exec(req.path);
-  if (!match) {
+  const parsed = parseExtensionRoute(req.path, ACTIONS_ROUTE_RE);
+  if (!parsed) {
     next();
     return;
   }
 
-  const projectId = match[1];
-  const extensionName = match[2];
-
-  if (!projectId || !extensionName) {
-    next();
-    return;
-  }
+  const { projectId, extensionName } = parsed;
 
   const info = getMountedInfo(projectId, extensionName);
   if (!info) {
