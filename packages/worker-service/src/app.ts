@@ -33,6 +33,8 @@ import { chatRouter, projectChatRouter } from "./routes/chat.js";
 import worktreeRouter from "./routes/worktrees.js";
 import automationRouter from "./routes/automations.js";
 import extCronRouter from "./routes/ext-cron.js";
+import eventsRouter from "./routes/events.js";
+import { contextProviderRouteMiddleware } from "./middleware/context-provider-route.js";
 import { registerBuiltInProviders } from "./core/context-recipe-engine.js";
 import { seedBuiltinRules } from "./core/tool-governance.js";
 
@@ -103,8 +105,11 @@ export function createApp(): express.Application {
   app.use(worktreeRouter);
   app.use(automationRouter);
   app.use(extCronRouter);
+  app.use(eventsRouter);
   // Actions discovery route (must come before extension router)
   app.use(actionsRouteMiddleware);
+  // Context provider route (must come before extension router)
+  app.use(contextProviderRouteMiddleware);
   // MCP bridge routes (must come before extension router, after core routes)
   app.use(mcpBridgeMiddleware);
   // Extension request routing (must come before static serving, after core routes)

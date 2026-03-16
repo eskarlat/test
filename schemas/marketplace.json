@@ -1,24 +1,143 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renre-kit.dev/schemas/marketplace.json",
   "title": "RenRe Kit Marketplace Index",
+  "description": "Schema for marketplace.json — the index file served by a marketplace source listing available extensions.",
   "type": "object",
   "required": ["name", "extensions"],
+  "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string" },
-    "name": { "type": "string" },
-    "version": { "type": "string" },
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference"
+    },
+    "name": {
+      "type": "string",
+      "description": "Marketplace display name.",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the marketplace.",
+      "maxLength": 512
+    },
+    "version": {
+      "type": "string",
+      "description": "Marketplace index version."
+    },
+    "url": {
+      "type": "string",
+      "description": "Canonical URL of this marketplace.",
+      "format": "uri"
+    },
     "extensions": {
       "type": "array",
+      "description": "List of extensions available in this marketplace.",
       "items": {
-        "type": "object",
-        "required": ["name", "version", "description", "repository"],
-        "properties": {
-          "name": { "type": "string" },
-          "version": { "type": "string" },
-          "description": { "type": "string" },
-          "repository": { "type": "string", "format": "uri" },
-          "path": { "type": "string" },
-          "tags": { "type": "array", "items": { "type": "string" } }
+        "$ref": "#/definitions/MarketplaceExtension"
+      }
+    }
+  },
+  "definitions": {
+    "MarketplaceExtension": {
+      "type": "object",
+      "required": ["name", "version", "description", "repository"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique extension identifier (kebab-case).",
+          "pattern": "^(?!__)[a-z][a-z0-9-]*$",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "version": {
+          "type": "string",
+          "description": "Latest available version (semver).",
+          "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable extension name.",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "description": {
+          "type": "string",
+          "description": "Short description of the extension.",
+          "maxLength": 512
+        },
+        "author": {
+          "type": "string",
+          "description": "Author or organization name.",
+          "minLength": 1
+        },
+        "repository": {
+          "type": "string",
+          "description": "Git repository URL for downloading the extension.",
+          "format": "uri"
+        },
+        "path": {
+          "type": "string",
+          "description": "Subdirectory within the repository containing the extension."
+        },
+        "tags": {
+          "type": "array",
+          "description": "Searchable tags for categorization.",
+          "items": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "maxItems": 20
+        },
+        "license": {
+          "type": "string",
+          "description": "SPDX license identifier.",
+          "maxLength": 64
+        },
+        "homepage": {
+          "type": "string",
+          "description": "Extension homepage or documentation URL.",
+          "format": "uri"
+        },
+        "minSdkVersion": {
+          "type": "string",
+          "description": "Minimum SDK version required (semver)."
+        },
+        "permissions": {
+          "type": "object",
+          "description": "Permissions summary for display at install time.",
+          "properties": {
+            "database": { "type": "boolean" },
+            "network": {
+              "oneOf": [
+                { "type": "boolean" },
+                { "type": "array", "items": { "type": "string" } }
+              ]
+            },
+            "mcp": { "type": "boolean" },
+            "hooks": { "type": "boolean" },
+            "vault": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "filesystem": {
+              "oneOf": [
+                { "type": "boolean" },
+                { "type": "array", "items": { "type": "string" } }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "deprecated": {
+          "type": "boolean",
+          "description": "Whether this extension is deprecated."
+        },
+        "replacement": {
+          "type": "string",
+          "description": "If deprecated, the recommended replacement extension name."
         }
       }
     }
