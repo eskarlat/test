@@ -11,13 +11,6 @@ vi.mock("../core/logger.js", () => ({
 }));
 
 // Mock context-recipe-engine
-const mockRecipe = {
-  providers: [
-    { providerId: "session-memory", enabled: true, config: {} },
-  ],
-  tokenBudget: 4000,
-};
-
 vi.mock("../core/context-recipe-engine.js", () => ({
   getRecipe: vi.fn().mockReturnValue({
     providers: [{ providerId: "session-memory", enabled: true, config: {} }],
@@ -38,11 +31,9 @@ vi.mock("../core/context-recipe-engine.js", () => ({
 import { createTestApp, request } from "../test-helpers.js";
 import router from "./context-recipe.js";
 import {
-  getRecipe,
   saveRecipe,
   resetRecipe,
   preview,
-  getRegisteredProviders,
   assemble,
 } from "../core/context-recipe-engine.js";
 

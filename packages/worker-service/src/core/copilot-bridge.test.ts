@@ -87,9 +87,6 @@ import { eventBus } from "./event-bus.js";
 import { listMounted } from "./extension-registry.js";
 import { circuitBreaker } from "./extension-circuit-breaker.js";
 import { getRegistry as getProjectRegistry } from "../routes/projects.js";
-import { assemble } from "./context-recipe-engine.js";
-import { getBuiltinTools } from "./chat-builtin-tools.js";
-import { getServerPort } from "./server-port.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -952,7 +949,7 @@ describe("CopilotBridge", () => {
       );
 
       // Get the requestId from the emit call
-      const permEmitCall = mockIO.to.mock.results.find((r: any) => r.value?.emit);
+      const _permEmitCall = mockIO.to.mock.results.find((r: any) => r.value?.emit);
       const emitMock = mockIO.to.mock.results
         .map((r: any) => r.value?.emit)
         .filter(Boolean);
@@ -1170,7 +1167,7 @@ describe("CopilotBridge", () => {
       await bridge.sendMessage(sessionId, "test");
 
       // Now the SDK fires turn_start — should be suppressed
-      const allEmitsBefore = innerEmit.mock.calls.length;
+      const _allEmitsBefore = innerEmit.mock.calls.length;
       onHandler({ type: "assistant.turn_start", data: {} });
       // The suppressed turn_start should NOT add a new emit
       const turnStartAfter = innerEmit.mock.calls.filter(
@@ -1541,7 +1538,7 @@ describe("CopilotBridge", () => {
       await bridge.ensureStarted();
       const mockSession = createMockSession();
       mockClientCreateSession.mockResolvedValue(mockSession);
-      const sessionId = await bridge.createChatSession({ projectId: "proj-1" });
+      const _sessionId = await bridge.createChatSession({ projectId: "proj-1" });
 
       // Trigger events — should not throw even without IO
       const onHandler = mockSession.on.mock.calls[0]?.[0];

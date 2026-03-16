@@ -3,7 +3,6 @@ import {
   listPatterns,
   resolvePattern,
   ignorePattern,
-  reactivateIfRecurring,
   trends,
   getPatternStats,
   listErrors,
