@@ -48,12 +48,7 @@ export function buildToolStartUpdate(
     tools.set(data.toolCallId, { ...data, status: "running", startedAt: Date.now() });
 
     const msgs = new Map(s.messages);
-    const list = msgs.get(sessionId) ?? [];
-    const last = list[list.length - 1];
-    if (last?.role === "assistant") {
-      const updated = { ...last, blocks: [...last.blocks, block] };
-      msgs.set(sessionId, [...list.slice(0, -1), updated]);
-    }
+    appendBlockToLastAssistant(msgs, sessionId, block);
     return { activeTools: tools, messages: msgs };
   };
 }
@@ -103,12 +98,7 @@ export function buildSubagentStartUpdate(
     subs.set(data.toolCallId, { ...data, status: "running", startedAt: Date.now() });
 
     const msgs = new Map(s.messages);
-    const list = msgs.get(sessionId) ?? [];
-    const last = list[list.length - 1];
-    if (last?.role === "assistant") {
-      const updated = { ...last, blocks: [...last.blocks, block] };
-      msgs.set(sessionId, [...list.slice(0, -1), updated]);
-    }
+    appendBlockToLastAssistant(msgs, sessionId, block);
     return { activeSubagents: subs, messages: msgs };
   };
 }
@@ -193,6 +183,20 @@ export function createErrorMessage(message: string): ChatMessage {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+/** Append a content block to the last assistant message for a session. */
+function appendBlockToLastAssistant(
+  messages: Map<string, ChatMessage[]>,
+  sessionId: string,
+  block: ContentBlock,
+): void {
+  const list = messages.get(sessionId) ?? [];
+  const last = list[list.length - 1];
+  if (last?.role === "assistant") {
+    const updated = { ...last, blocks: [...last.blocks, block] };
+    messages.set(sessionId, [...list.slice(0, -1), updated]);
+  }
+}
 
 function updateToolBlock(
   messages: ChatMessage[],

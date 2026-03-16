@@ -51,7 +51,7 @@ describe("ChatToolExecution", () => {
   it("shows error in compact mode", () => {
     useChatPreferencesStore.setState({ toolDisplayMode: "compact" });
     const errorBlock = makeBlock({ status: "error", error: "File not found" });
-    delete (errorBlock as Record<string, unknown>).result;
+    delete (errorBlock as unknown as Record<string, unknown>).result;
     render(
       <ChatToolExecution block={errorBlock} />,
     );

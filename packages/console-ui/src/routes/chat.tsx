@@ -16,6 +16,12 @@ import { ChatInputDialog } from "../components/chat/ChatInputDialog";
 import { ChatElicitationDialog } from "../components/chat/ChatElicitationDialog";
 import { ChatLayoutRenderer } from "../components/chat/ChatLayoutRenderer";
 import { SplitMenu } from "../components/chat/SplitMenu";
+import {
+  buildToolStartUpdate,
+  buildToolCompleteUpdate,
+  buildSubagentStartUpdate,
+  buildSubagentCompleteUpdate,
+} from "../lib/chat-socket-handlers";
 import type { ChatMessage, ContentBlock } from "../types/chat";
 
 // ---------------------------------------------------------------------------
@@ -193,123 +199,22 @@ function useChatSocket(sessionId: string | null): void {
 
     function handleToolStart(data: { toolCallId: string; roundId: string; toolName: string; toolArgs?: Record<string, unknown> }): void {
       if (!sessionId) return;
-      const block: ContentBlock = {
-        type: "tool-execution",
-        toolCallId: data.toolCallId,
-        roundId: data.roundId,
-        toolName: data.toolName,
-        arguments: data.toolArgs ?? {},
-        status: "running",
-        isHistorical: false,
-      };
-      useChatStore.setState((s) => {
-        const tools = new Map(s.activeTools);
-        tools.set(data.toolCallId, { ...data, status: "running", startedAt: Date.now() });
-
-        const msgs = new Map(s.messages);
-        const list = msgs.get(sessionId!) ?? [];
-        const last = list[list.length - 1];
-        if (last?.role === "assistant") {
-          const updated = { ...last, blocks: [...last.blocks, block] };
-          msgs.set(sessionId!, [...list.slice(0, -1), updated]);
-        }
-        return { activeTools: tools, messages: msgs };
-      });
+      useChatStore.setState(buildToolStartUpdate(sessionId, data));
     }
 
     function handleToolComplete(data: { toolCallId: string; toolName?: string; result?: Record<string, unknown>; success?: boolean; error?: unknown }): void {
       if (!sessionId) return;
-      useChatStore.setState((s) => {
-        const tools = new Map(s.activeTools);
-        const tracked = tools.get(data.toolCallId);
-        const duration = tracked ? Date.now() - tracked.startedAt : undefined;
-        tools.delete(data.toolCallId);
-
-        const msgs = new Map(s.messages);
-        const list = msgs.get(sessionId!) ?? [];
-        const updatedList = list.map((msg) => {
-          if (msg.role !== "assistant") return msg;
-          const blockIdx = msg.blocks.findIndex(
-            (b) => b.type === "tool-execution" && b.toolCallId === data.toolCallId,
-          );
-          if (blockIdx < 0) return msg;
-          const oldBlock = msg.blocks[blockIdx] as import("../types/chat").ToolExecutionBlock;
-          const resultObj = data.result ?? {};
-          const resultContent = typeof resultObj === "object" && resultObj !== null && "content" in resultObj && typeof (resultObj as Record<string, unknown>).content === "string"
-            ? (resultObj as Record<string, unknown>).content as string
-            : JSON.stringify(resultObj, null, 2);
-          const errorStr = data.error
-            ? (typeof data.error === "object" ? JSON.stringify(data.error) : String(data.error))
-            : undefined;
-          const newBlock: ContentBlock = {
-            ...oldBlock,
-            status: data.success === false ? "error" : "complete",
-            result: { content: resultContent },
-            ...(errorStr ? { error: errorStr } : {}),
-            ...(duration != null ? { duration } : {}),
-          };
-          const blocks = [...msg.blocks];
-          blocks[blockIdx] = newBlock;
-          return { ...msg, blocks };
-        });
-        msgs.set(sessionId!, updatedList);
-        return { activeTools: tools, messages: msgs };
-      });
+      useChatStore.setState(buildToolCompleteUpdate(sessionId, data));
     }
 
     function handleSubagentStart(data: { toolCallId: string; agentName: string; agentDisplayName?: string }): void {
       if (!sessionId) return;
-      const block: ContentBlock = {
-        type: "subagent",
-        toolCallId: data.toolCallId,
-        agentName: data.agentName,
-        agentDisplayName: data.agentDisplayName ?? data.agentName,
-        status: "running",
-      };
-      useChatStore.setState((s) => {
-        const subs = new Map(s.activeSubagents);
-        subs.set(data.toolCallId, { ...data, status: "running", startedAt: Date.now() });
-
-        const msgs = new Map(s.messages);
-        const list = msgs.get(sessionId!) ?? [];
-        const last = list[list.length - 1];
-        if (last?.role === "assistant") {
-          const updated = { ...last, blocks: [...last.blocks, block] };
-          msgs.set(sessionId!, [...list.slice(0, -1), updated]);
-        }
-        return { activeSubagents: subs, messages: msgs };
-      });
+      useChatStore.setState(buildSubagentStartUpdate(sessionId, data));
     }
 
     function handleSubagentComplete(data: { toolCallId: string }): void {
       if (!sessionId) return;
-      useChatStore.setState((s) => {
-        const subs = new Map(s.activeSubagents);
-        const tracked = subs.get(data.toolCallId);
-        const duration = tracked ? Date.now() - tracked.startedAt : undefined;
-        subs.delete(data.toolCallId);
-
-        const msgs = new Map(s.messages);
-        const list = msgs.get(sessionId!) ?? [];
-        const updatedList = list.map((msg) => {
-          if (msg.role !== "assistant") return msg;
-          const blockIdx = msg.blocks.findIndex(
-            (b) => b.type === "subagent" && b.toolCallId === data.toolCallId,
-          );
-          if (blockIdx < 0) return msg;
-          const oldBlock = msg.blocks[blockIdx] as import("../types/chat").SubagentBlock;
-          const newBlock: ContentBlock = {
-            ...oldBlock,
-            status: "complete",
-            ...(duration != null ? { duration } : {}),
-          };
-          const blocks = [...msg.blocks];
-          blocks[blockIdx] = newBlock;
-          return { ...msg, blocks };
-        });
-        msgs.set(sessionId!, updatedList);
-        return { activeSubagents: subs, messages: msgs };
-      });
+      useChatStore.setState(buildSubagentCompleteUpdate(sessionId, data));
     }
 
     function handlePermission(data: { requestId: string; title: string; message: string; permissionKind: string; diff?: string }): void {

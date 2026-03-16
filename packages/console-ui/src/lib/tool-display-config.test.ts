@@ -3,7 +3,9 @@ import { getToolDisplayConfig } from "./tool-display-config";
 import type { ToolResult } from "../types/chat";
 
 function makeResult(content: string, detailedContent?: string): ToolResult {
-  return { content, detailedContent };
+  const result: ToolResult = { content };
+  if (detailedContent !== undefined) result.detailedContent = detailedContent;
+  return result;
 }
 
 describe("tool-display-config", () => {
