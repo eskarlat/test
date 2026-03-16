@@ -218,7 +218,7 @@ describe("AutomationEngine", () => {
 
       expect(updated.name).toBe("Updated Name");
       expect(updated.description).toBe("Updated description");
-      expect(updated.updatedAt).toBeTruthy();
+      expect(updated.updatedAt).not.toBe(created.updatedAt);
     });
 
     it("throws when updating non-existent automation", () => {

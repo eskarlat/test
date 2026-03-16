@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { ReactNode } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { useToolAnalyticsStore } from "../stores/tool-analytics-store";
@@ -22,12 +23,12 @@ vi.mock("../api/socket", () => ({
 
 // Mock recharts to avoid rendering issues in jsdom
 vi.mock("recharts", () => ({
-  BarChart: ({ children }: { children: React.ReactNode }) => <div data-testid="bar-chart">{children}</div>,
+  BarChart: ({ children }: { children: ReactNode }) => <div data-testid="bar-chart">{children}</div>,
   Bar: () => <div />,
   XAxis: () => <div />,
   YAxis: () => <div />,
   Tooltip: () => <div />,
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  ResponsiveContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   CartesianGrid: () => <div />,
 }));
 

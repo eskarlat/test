@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, existsSync, readdirSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, readdirSync, rmSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import Database from "better-sqlite3";
@@ -100,9 +100,8 @@ describe("backup-manager", () => {
       const oldFile = join(backupsPath, "data-old-periodic.db");
       writeFileSync(oldFile, "fake");
       // Set mtime to 100 days ago
-      const fs = require("node:fs");
       const oldTime = new Date(Date.now() - 100 * 24 * 3600 * 1000);
-      fs.utimesSync(oldFile, oldTime, oldTime);
+      utimesSync(oldFile, oldTime, oldTime);
 
       pruneBackups({ maxCount: 100, maxAgeDays: 30 });
       expect(existsSync(oldFile)).toBe(false);
@@ -115,8 +114,7 @@ describe("backup-manager", () => {
         const f = join(backupsPath, `data-${i}-periodic.db`);
         writeFileSync(f, `backup-${i}`);
         const time = new Date(Date.now() - (5 - i) * 1000);
-        const fs = require("node:fs");
-        fs.utimesSync(f, time, time);
+        utimesSync(f, time, time);
       }
 
       pruneBackups({ maxCount: 2, maxAgeDays: 365 });
