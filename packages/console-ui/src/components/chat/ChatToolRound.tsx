@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Wrench } from "lucide-react";
 import { ChatToolExecution } from "./ChatToolExecution";
+import { useChatPreferencesStore } from "../../stores/chat-preferences-store";
 import type { ContentBlock, ToolExecutionBlock, ToolRound } from "../../types/chat";
 
 // ---------------------------------------------------------------------------
@@ -73,12 +74,45 @@ function isRoundActive(tools: ToolExecutionBlock[]): boolean {
 }
 
 function MultiToolRound({ round }: { round: ToolRound }) {
+  const mode = useChatPreferencesStore((s) => s.toolDisplayMode);
   const [expanded, setExpanded] = useState(true);
   const active = isRoundActive(round.tools);
   const completeCount = round.tools.filter((t) => t.status === "complete").length;
   const headerText = active
     ? `Running ${round.tools.length} tools`
     : `Ran ${round.tools.length} tools`;
+
+  // Compact mode: summary header + flat list of compact tool lines (ADR-052 §1.3.1)
+  if (mode === "compact") {
+    return (
+      <div className="space-y-0.5">
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="flex items-center gap-2 w-full px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {expanded ? (
+            <ChevronDown className="h-3 w-3 flex-shrink-0" />
+          ) : (
+            <ChevronRight className="h-3 w-3 flex-shrink-0" />
+          )}
+          <Wrench className="h-3 w-3 flex-shrink-0" />
+          <span className="font-medium">{headerText}</span>
+          {!active && (
+            <span className="text-[10px] font-mono">
+              {completeCount}/{round.tools.length}
+            </span>
+          )}
+        </button>
+        {expanded && (
+          <div className="space-y-0.5 pl-2">
+            {round.tools.map((tool) => (
+              <ChatToolExecution key={tool.toolCallId} block={tool} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-md border border-border">

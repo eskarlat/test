@@ -3,6 +3,9 @@ import { Loader2, Check, XCircle, ChevronDown, ChevronRight, Puzzle } from "luci
 import { cn } from "../../lib/utils";
 import { CopyButton } from "./CopyButton";
 import { formatDuration } from "./format-duration";
+import { useChatPreferencesStore } from "../../stores/chat-preferences-store";
+import { getToolIntent } from "../../lib/tool-intent";
+import { getToolDisplayConfig } from "../../lib/tool-display-config";
 import type { ToolExecutionBlock } from "../../types/chat";
 
 /** Detect extension-namespaced tools: `extName__toolName` → { ext, tool } */
@@ -250,14 +253,46 @@ function ToolError({ status, error }: ToolErrorProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Main component
+// Compact view (ADR-052 §1.3)
 // ---------------------------------------------------------------------------
 
-interface ChatToolExecutionProps {
-  block: ToolExecutionBlock;
+function CompactToolView({ block }: { block: ToolExecutionBlock }) {
+  const intent = getToolIntent(block.toolName, block.arguments);
+  const config = getToolDisplayConfig(block.toolName);
+  const resultSummary =
+    block.status === "complete" && block.result ? config.resultSummary(block.result) : "";
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs",
+        block.status === "error"
+          ? "bg-destructive/5 text-destructive"
+          : "bg-muted/30",
+      )}
+    >
+      <StatusIcon status={block.status} />
+      <span className="font-mono font-medium truncate">{intent}</span>
+      {resultSummary && (
+        <span className="text-muted-foreground truncate">{resultSummary}</span>
+      )}
+      {block.status === "error" && block.error && (
+        <span className="text-destructive truncate">{block.error}</span>
+      )}
+      {block.duration != null && block.status === "complete" && (
+        <span className="ml-auto flex-shrink-0 font-mono text-muted-foreground">
+          {formatDuration(block.duration)}
+        </span>
+      )}
+    </div>
+  );
 }
 
-export function ChatToolExecution({ block }: ChatToolExecutionProps) {
+// ---------------------------------------------------------------------------
+// Standard view — current behavior, extracted (ADR-052 §1.3)
+// ---------------------------------------------------------------------------
+
+function StandardToolView({ block }: { block: ToolExecutionBlock }) {
   const displayName = formatToolName(block.toolName, block.mcpServerName);
   const label = statusLabel(block);
   const isActive = block.status === "pending" || block.status === "validating" || block.status === "running";
@@ -289,4 +324,86 @@ export function ChatToolExecution({ block }: ChatToolExecutionProps) {
       <ToolError status={block.status} error={block.error} />
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Verbose view — all sections expanded (ADR-052 §1.3)
+// ---------------------------------------------------------------------------
+
+function VerboseToolView({ block }: { block: ToolExecutionBlock }) {
+  const displayName = formatToolName(block.toolName, block.mcpServerName);
+  const label = statusLabel(block);
+  const isExtensionTool = parseNamespacedTool(block.toolName) !== null;
+  const hasArguments = Object.keys(block.arguments).length > 0 || block.argumentsStreaming;
+  const argsDisplay =
+    block.argumentsStreaming && block.status !== "complete"
+      ? block.argumentsStreaming
+      : formatJson(block.arguments);
+  const resultText = block.result?.detailedContent ?? block.result?.content ?? "";
+
+  return (
+    <div
+      className={cn(
+        "rounded-md border text-sm",
+        block.status === "error"
+          ? "border-destructive/30 bg-destructive/5"
+          : "border-border bg-muted/30",
+      )}
+    >
+      <ToolHeader
+        status={block.status}
+        displayName={displayName}
+        label={label}
+        duration={block.duration}
+        isExtensionTool={isExtensionTool}
+      />
+      {/* Arguments — always expanded in verbose */}
+      {hasArguments && (
+        <div className="px-3 pb-2">
+          <CollapsibleSection label="Arguments" defaultExpanded copyText={argsDisplay}>
+            <pre className="p-2 bg-muted rounded text-[11px] font-mono overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap break-all">
+              {argsDisplay}
+            </pre>
+          </CollapsibleSection>
+        </div>
+      )}
+      <ToolProgress
+        progressMessage={block.progressMessage}
+        partialOutput={block.partialOutput}
+        isActive={block.status === "pending" || block.status === "validating" || block.status === "running"}
+      />
+      {/* Result — always expanded in verbose */}
+      {block.status === "complete" && block.result && (
+        <div className="px-3 pb-2">
+          <CollapsibleSection label="Result" defaultExpanded copyText={resultText}>
+            <pre className="p-2 bg-muted rounded text-[11px] font-mono overflow-x-auto max-h-64 overflow-y-auto whitespace-pre-wrap break-words">
+              {resultText}
+            </pre>
+          </CollapsibleSection>
+        </div>
+      )}
+      <ToolError status={block.status} error={block.error} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component — dispatches to display mode (ADR-052 §1.3)
+// ---------------------------------------------------------------------------
+
+interface ChatToolExecutionProps {
+  block: ToolExecutionBlock;
+}
+
+export function ChatToolExecution({ block }: ChatToolExecutionProps) {
+  const mode = useChatPreferencesStore((s) => s.toolDisplayMode);
+
+  switch (mode) {
+    case "compact":
+      return <CompactToolView block={block} />;
+    case "verbose":
+      return <VerboseToolView block={block} />;
+    default:
+      return <StandardToolView block={block} />;
+  }
 }

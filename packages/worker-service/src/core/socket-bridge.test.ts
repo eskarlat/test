@@ -167,16 +167,69 @@ describe("socket-bridge", () => {
     });
   });
 
-  describe("chat stubs", () => {
-    it("returns error for chat:send", async () => {
+  describe("chat:send with explicit sessionId (ADR-052)", () => {
+    it("returns error when not joined to any chat room", async () => {
       const client = createClient();
       await connectAndWaitReady(client);
 
-      const errorPromise = waitForEvent<{ message: string }>(client, "error");
-      client.emit("chat:send", { text: "hello" });
-      const error = await errorPromise;
+      const result = await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+        client.emit("chat:send", { prompt: "hello" }, resolve);
+      });
 
-      expect(error.message).toBe("Chat not available");
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe("Not joined to a chat session");
+    });
+
+    it("returns error when explicit sessionId room not joined", async () => {
+      const client = createClient();
+      await connectAndWaitReady(client);
+
+      // Join a different chat room
+      client.emit("chat:join", "session-A");
+      await new Promise((r) => setTimeout(r, 50));
+
+      const result = await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+        client.emit("chat:send", { prompt: "hello", sessionId: "session-B" }, resolve);
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe("Not joined to the specified chat session");
+    });
+
+    it("falls back to room inference when no explicit sessionId", async () => {
+      const client = createClient();
+      await connectAndWaitReady(client);
+
+      client.emit("chat:join", "session-A");
+      await new Promise((r) => setTimeout(r, 50));
+
+      // Without explicit sessionId, withSession uses getSessionFromSocket()
+      // which finds session-A. copilotBridge.sendMessage will reject since
+      // no real bridge is running, but the session resolution itself succeeds.
+      const result = await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+        client.emit("chat:send", { prompt: "hello" }, resolve);
+      });
+
+      // The bridge call will fail (no real copilot bridge), but the session
+      // was resolved correctly (not "Not joined to a chat session")
+      expect(result.error).not.toBe("Not joined to a chat session");
+    });
+  });
+
+  describe("chat:cancel with explicit sessionId (ADR-052)", () => {
+    it("returns error when explicit sessionId room not joined", async () => {
+      const client = createClient();
+      await connectAndWaitReady(client);
+
+      client.emit("chat:join", "session-A");
+      await new Promise((r) => setTimeout(r, 50));
+
+      const result = await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+        client.emit("chat:cancel", { sessionId: "session-X" }, resolve);
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe("Not joined to the specified chat session");
     });
   });
 });

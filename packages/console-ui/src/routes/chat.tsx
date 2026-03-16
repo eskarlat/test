@@ -7,6 +7,7 @@ import { ChatSessionList } from "../components/chat/ChatSessionList";
 import { ChatMessageList } from "../components/chat/ChatMessageList";
 import { ChatInput } from "../components/chat/ChatInput";
 import { ChatModelSelector } from "../components/chat/ChatModelSelector";
+import { ToolDisplayModeSelector } from "../components/chat/ToolDisplayModeSelector";
 import { ChatEmptyState } from "../components/chat/ChatEmptyState";
 import { ChatContextBar } from "../components/chat/ChatContextBar";
 import { ChatPermissionBanner } from "../components/chat/ChatPermissionBanner";
@@ -587,6 +588,7 @@ export default function ChatPage() {
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
               </button>
               <ChatModelSelector />
+              <ToolDisplayModeSelector />
             </div>
             <ChatContextBar />
             <ChatMessageList sessionId={sessionId} />
