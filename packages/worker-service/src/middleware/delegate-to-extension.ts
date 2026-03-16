@@ -1,6 +1,27 @@
 import type { Request, Response, NextFunction, Router } from "express";
 import { logger } from "../core/logger.js";
 
+export interface ExtensionRouteMatch {
+  projectId: string;
+  extensionName: string;
+}
+
+/**
+ * Parse projectId and extensionName from an extension-scoped route.
+ * Returns null if the path doesn't match or params are missing.
+ */
+export function parseExtensionRoute(
+  path: string,
+  pattern: RegExp,
+): ExtensionRouteMatch | null {
+  const match = pattern.exec(path);
+  if (!match) return null;
+  const projectId = match[1];
+  const extensionName = match[2];
+  if (!projectId || !extensionName) return null;
+  return { projectId, extensionName };
+}
+
 export interface DelegationOptions {
   extensionName: string;
   rewritePath: string;

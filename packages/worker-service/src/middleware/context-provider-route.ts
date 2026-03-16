@@ -1,7 +1,9 @@
 import type { Request, Response, NextFunction } from "express";
 import { getMountedInfo, getRouter } from "../core/extension-registry.js";
 import { getRegistry as getProjectRegistry } from "../routes/projects.js";
-import { delegateToExtensionRouter } from "./delegate-to-extension.js";
+import { parseExtensionRoute, delegateToExtensionRouter } from "./delegate-to-extension.js";
+
+const CONTEXT_ROUTE_RE = /^\/api\/([^/]+)\/([^/]+)\/__context$/;
 
 /**
  * POST /api/{projectId}/{extensionName}/__context — Context Provider route (ADR-036)
@@ -19,19 +21,13 @@ export function contextProviderRouteMiddleware(
     return;
   }
 
-  const match = /^\/api\/([^/]+)\/([^/]+)\/__context$/.exec(req.path);
-  if (!match) {
+  const parsed = parseExtensionRoute(req.path, CONTEXT_ROUTE_RE);
+  if (!parsed) {
     next();
     return;
   }
 
-  const projectId = match[1];
-  const extensionName = match[2];
-
-  if (!projectId || !extensionName) {
-    next();
-    return;
-  }
+  const { projectId, extensionName } = parsed;
 
   // Check project is registered
   const projectRegistry = getProjectRegistry();
