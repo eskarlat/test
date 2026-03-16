@@ -452,7 +452,7 @@ describe("chat-builtin-tools", () => {
     it("respects limit parameter", async () => {
       mocks.searchAll.mockReturnValue([{ id: "1" }, { id: "2" }, { id: "3" }]);
       const tool = findTool("search");
-      const result = await tool.handler({ query: "test", limit: 5 });
+      const _result = await tool.handler({ query: "test", limit: 5 });
       expect(mocks.searchAll).toHaveBeenCalledWith(PROJECT_ID, "test", 5);
     });
 
@@ -470,7 +470,7 @@ describe("chat-builtin-tools", () => {
       mocks.searchErrors.mockReturnValue([{ id: "e1" }]);
 
       const tool = findTool("search");
-      const result = await tool.handler({
+      const _result = await tool.handler({
         query: "x",
         tables: ["prompts", "observations", "errors"],
         limit: 5,
