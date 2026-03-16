@@ -15,7 +15,6 @@ import type {
   ResolvedExtension,
   MarketplaceConfig,
   MarketplaceEntry,
-  MarketplaceIndex,
 } from "../types.js";
 import { parseSourceUri } from "../parse.js";
 import { GitResolver } from "./git.js";
@@ -142,8 +141,9 @@ export class MarketplaceResolver implements SourceResolver {
       try {
         const extensions = this.fetchMarketplaceIndex(mp.url);
         marketplaces.push({ name: mp.name, url: mp.url, extensions, fetchedAt: now });
-      } catch {
-        // Skip failed marketplaces — log but continue
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`[source-resolver] Failed to fetch marketplace "${mp.name}" (${mp.url}): ${message}`);
       }
     }
 

@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { homedir } from "node:os";
 import type { ParsedSource, SourceScheme } from "./types.js";
 
 const SCHEME_PREFIXES: readonly SourceScheme[] = [
@@ -156,7 +157,8 @@ function splitGitRef(input: string): [url: string, ref: string] {
 }
 
 function parseLocalBody(body: string, link: boolean): ParsedSource {
-  const absPath = resolve(body);
+  const expanded = body.startsWith("~") ? homedir() + body.slice(1) : body;
+  const absPath = resolve(expanded);
   const segments = absPath.split("/").filter(Boolean);
   const name = segments[segments.length - 1] ?? "unknown";
   const scheme: SourceScheme = link ? "local+link" : "local";

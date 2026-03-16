@@ -5,4 +5,5 @@ export default defineWorkspace([
   "packages/worker-service/vitest.config.ts",
   "packages/console-ui/vitest.config.ts",
   "packages/extension-sdk/vitest.config.ts",
+  "packages/source-resolver/vitest.config.ts",
 ]);

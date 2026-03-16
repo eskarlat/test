@@ -32,9 +32,13 @@ export function cloneAndCopy(opts: {
   const tempDir = mkdtempSync(join(tmpdir(), "renre-kit-dl-"));
 
   try {
+    const isSha = ref ? /^[0-9a-f]{7,40}$/i.test(ref) : false;
+
     // Build git clone args
-    const args = ["clone", "--depth=1"];
-    if (ref && ref !== "latest") {
+    // SHA refs cannot use --branch; clone first then checkout
+    const args = ["clone"];
+    if (!isSha) args.push("--depth=1");
+    if (ref && ref !== "latest" && !isSha) {
       args.push("--branch", ref);
     }
     args.push(cloneUrl, tempDir);
@@ -49,6 +53,21 @@ export function cloneAndCopy(opts: {
     if (result.status !== 0) {
       const stderr = result.stderr?.trim() ?? "";
       throw new Error(`git clone failed (exit ${result.status ?? "null"}): ${stderr}`);
+    }
+
+    // For SHA refs, checkout the specific commit after cloning
+    if (isSha && ref) {
+      // eslint-disable-next-line sonarjs/no-os-command-from-path
+      const checkout = spawnSync("git", ["checkout", ref], {
+        cwd: tempDir,
+        stdio: "pipe",
+        encoding: "utf8",
+        timeout: 30_000,
+      });
+      if (checkout.status !== 0) {
+        const stderr = checkout.stderr?.trim() ?? "";
+        throw new Error(`git checkout ${ref} failed (exit ${checkout.status ?? "null"}): ${stderr}`);
+      }
     }
 
     // Determine source directory (full clone or subpath)
